@@ -1,3 +1,7 @@
+use rc_sim::projector::{count_nonzero_components};
+use rc_sim::projector::{aib_project, frobenius_norm, flatten};
+use rand::Rng;
+use nalgebra::DMatrix;
 
 
 #[test]
@@ -69,8 +73,7 @@ fn test_axial_tensor_projects_to_zero() {
         }
     }
 }
-use rc_sim::projector::{aib_project, frobenius_norm};
-use rand::Rng;
+
 
 #[test]
 fn test_norm_reduces() {
@@ -89,4 +92,64 @@ fn test_norm_reduces() {
     let after  = frobenius_norm(&aib_project(t));
 
     assert!(after <= before + 1e-10, "norm did not decrease: before {before}, after {after}");
+}
+
+
+#[test]
+//fn test_projector_leaves_20_dof() {
+//    let mut rng = rand::thread_rng();
+//    let mut t = [[[0.0; 3]; 3]; 3];
+//    for a in 0..3 {
+//        for b in 0..3 {
+//            for c in 0..3 {
+//                t[a][b][c] = rng.gen_range(-1.0..1.0);
+//            }
+//       }
+//    }
+//
+//    let projected = aib_project(t);
+//    let count = count_nonzero_components(&projected);
+//
+//    assert_eq!(count, 20, "Expected 20 degrees of freedom, got {}", count);
+//}
+
+
+
+#[test]
+fn test_projected_rank_at_most_20() {
+    let mut rng = rand::thread_rng();
+    const N: usize = 30; // > 20
+
+    // Build an N × 27 matrix whose rows are projected tensors
+    let mut data = Vec::<f64>::with_capacity(N * 27);
+
+    for _ in 0..N {
+        // random tensor
+        let mut t = [[[0.0; 3]; 3]; 3];
+        for a in 0..3 {
+            for b in 0..3 {
+                for c in 0..3 {
+                    t[a][b][c] = rng.gen_range(-1.0..1.0);
+                }
+            }
+        }
+        let p = aib_project(t);
+        data.extend_from_slice(&flatten(&p));
+    }
+
+    let mat = DMatrix::from_row_slice(N, 27, &data);
+
+    // Compute numerical rank with simple threshold
+    let svd = mat.svd(true, true);
+    let tol = 1e-8;
+    let rank = svd
+        .singular_values
+        .iter()
+        .filter(|&&sigma| sigma > tol)
+        .count();
+
+    assert!(
+        rank <= 20,
+        "Projected tensors span rank {rank}, expected ≤ 20"
+    );
 }
