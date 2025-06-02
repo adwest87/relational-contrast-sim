@@ -1,4 +1,4 @@
-use rc_sim::projector::aib_project;
+
 
 #[test]
 fn test_zero_tensor_returns_zero() {
@@ -68,4 +68,25 @@ fn test_axial_tensor_projects_to_zero() {
             }
         }
     }
+}
+use rc_sim::projector::{aib_project, frobenius_norm};
+use rand::Rng;
+
+#[test]
+fn test_norm_reduces() {
+    // random tensor
+    let mut rng = rand::thread_rng();
+    let mut t = [[[0.0; 3]; 3]; 3];
+    for a in 0..3 {
+        for b in 0..3 {
+            for c in 0..3 {
+                t[a][b][c] = rng.gen_range(-1.0..1.0);
+            }
+        }
+    }
+
+    let before = frobenius_norm(&t);
+    let after  = frobenius_norm(&aib_project(t));
+
+    assert!(after <= before + 1e-10, "norm did not decrease: before {before}, after {after}");
 }
