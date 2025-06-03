@@ -101,4 +101,11 @@ impl Graph {
             .map(|link| link.w * link.w.ln())
             .sum()
     }
-}
+
+    /// Multiply every link weight by the same factor λ
+    pub fn rescale_weights(&mut self, lambda: f64) {
+        for link in &mut self.links {
+            link.w *= lambda;
+        }
+    }
+}    
