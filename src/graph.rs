@@ -93,5 +93,20 @@ impl Graph {
     pub fn m(&self) -> usize {
         self.links.len()
     }
+    
+    /// Compute the entropy action: sum of w * ln(w) for all links
+    pub fn entropy_action(&self) -> f64 {
+        let mut total = 0.0;
+        for link in &self.links {
+            let w = link.w;
+            // avoid log(0) or negative issues if w is extremely small
+            // (though we already set w >= 1e-6 in complete_random)
+            if w > 0.0 {
+                total += w * w.ln();
+            }
+        }
+        total
+    }
 }
+
 
