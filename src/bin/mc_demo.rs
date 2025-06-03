@@ -2,12 +2,39 @@ use rc_sim::graph::Graph;
 use std::fs::File;
 use std::io::Write;
 
+/// Simple proportional tuner for proposal widths
+struct Tuner {
+    delta: f64,
+    acc_count: usize,
+    window: usize,
+    target: f64,
+    band: f64,
+}
+impl Tuner {
+    fn new(delta: f64, window: usize, target: f64, band: f64) -> Self {
+        Self { delta, acc_count: 0, window, target, band }
+    }
+    /// Call after each proposal with `accepted == true` if accepted
+    fn update(&mut self, accepted: bool) {
+        if accepted { self.acc_count += 1; }
+        if self.acc_count + 1 == self.window { // window reached
+            let acc_rate = self.acc_count as f64 / self.window as f64;
+            if acc_rate > self.target + self.band {        // too easy → enlarge step
+                self.delta *= 1.1;
+            } else if acc_rate < self.target - self.band { // too hard → shrink step
+                self.delta *= 0.9;
+            }
+            self.acc_count = 0; // reset window
+        }
+    }
+}
+
+
 fn main() {
     // Simulation parameters
     let mut g          = Graph::complete_random(8);
     let beta           = 1.0;
-    let delta_w        = 0.10;
-    let delta_theta    = 0.20;
+    let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);   // start δθ=0.20
     let n_steps: usize = 10_000;
     let report_every   = 1_000;
 
@@ -19,20 +46,24 @@ fn main() {
 
     writeln!(
         csv,
-        "step,accept_rate,avg_w,avg_cos_theta,S_entropy,S_triangle,action"
+        "step,accept_rate,delta_theta,avg_w,avg_cos_theta,S_entropy,S_triangle,action"
     ).unwrap();
 
     // Counters
-    let mut accepted = 0;
+    let mut accepted_count = 0;
+
 
     println!(
         "# step  accept%   <w>      <cosθ>    S_entropy   S_triangle   action"
     );
 
     for step in 1..=n_steps {
-        if g.metropolis_step(beta, delta_w, delta_theta) {
-            accepted += 1;
+        let accepted = g.metropolis_step(beta, 0.0, tuner_th.delta);
+        if accepted {
+            accepted_count += 1;
         }
+        tuner_th.update(accepted);
+
 
         if step % report_every == 0 {
             // ---- observables ---------------------------------------
@@ -42,30 +73,34 @@ fn main() {
             let s_entropy = g.entropy_action();
             let s_tri     = g.triangle_action(1.0); // α = 1
             let total_a   = g.action();
-            let acc_rate  = accepted as f64 / step as f64;
+            let acc_rate = accepted_count as f64 / step as f64;
 
             println!(
-                "{:>6}  {:>7.3}  {:>7.4}  {:>8.4}  {:>11.4}  {:>11.4}  {:>8.2}",
+                "{:>6} {acc:>5.2}%  δw={:>6.3}  δθ={:>6.3}  ⟨w⟩={:>6.3}  ⟨cosθ⟩={:>6.3}  SΔ={:>8.2}  Sₑ={:>8.2}  A={:>8.2}",
                 step,
-                acc_rate,
+                tuner_th.delta,
                 avg_w,
                 avg_cos,
-                s_entropy,
                 s_tri,
+                s_entropy,
                 total_a,
+                acc = 100.0 * acc_rate,
             );
+
 
             writeln!(
                 csv,
-                "{},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5}",
+                "{},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5}",
                 step,
                 acc_rate,
+                tuner_th.delta,
                 avg_w,
                 avg_cos,
                 s_entropy,
                 s_tri,
-                total_a,
+                total_a
             ).unwrap();
+
 
         }
     }

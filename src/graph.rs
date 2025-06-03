@@ -54,14 +54,26 @@ impl Graph {
         let mut rng = rand::thread_rng();
         let link_index = rng.gen_range(0..self.links.len());
 
-        if rng.gen_bool(0.5) {
-            // Weight update
+        if delta_w == 0.0 {
+            // --- weights frozen: do phase update only ---
+            let mut rng = rand::thread_rng();
+            let link_index = rng.gen_range(0..self.links.len());
+            let dtheta: f64 = Uniform::new_inclusive(-delta_theta, delta_theta).sample(&mut rng);
+            let old = self.links[link_index].theta;
+            self.links[link_index].theta = old + dtheta;
+            Proposal::Phase { idx: link_index, old }
+        } else if rng.gen_bool(0.5) {
+            // --- normal weight update ---
+            let mut rng = rand::thread_rng();
+            let link_index = rng.gen_range(0..self.links.len());
             let eps: f64 = Uniform::new_inclusive(-delta_w, delta_w).sample(&mut rng);
             let old = self.links[link_index].w;
             self.links[link_index].w = old * eps.exp();
             Proposal::Weight { idx: link_index, old }
         } else {
-            // Phase update
+            // --- phase update ---
+            let mut rng = rand::thread_rng();
+            let link_index = rng.gen_range(0..self.links.len());
             let dtheta: f64 = Uniform::new_inclusive(-delta_theta, delta_theta).sample(&mut rng);
             let old = self.links[link_index].theta;
             self.links[link_index].theta = old + dtheta;
