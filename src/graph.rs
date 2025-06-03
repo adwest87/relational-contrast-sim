@@ -94,19 +94,11 @@ impl Graph {
         self.links.len()
     }
     
-    /// Compute the entropy action: sum of w * ln(w) for all links
+    /// Entropy term  S = Σ w ln w  (Dougal-invariant)
     pub fn entropy_action(&self) -> f64 {
-        let mut total = 0.0;
-        for link in &self.links {
-            let w = link.w;
-            // avoid log(0) or negative issues if w is extremely small
-            // (though we already set w >= 1e-6 in complete_random)
-            if w > 0.0 {
-                total += w * w.ln();
-            }
-        }
-        total
+        self.links
+            .iter()
+            .map(|link| link.w * link.w.ln())
+            .sum()
     }
 }
-
-
