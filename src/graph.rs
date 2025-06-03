@@ -52,7 +52,7 @@ pub enum Proposal {
 impl Graph {
     pub fn propose_update(&mut self, delta_w: f64, delta_theta: f64) -> Proposal {
         let mut rng = rand::thread_rng();
-        let link_index = rng.gen_range(0..self.links.len());
+        let _ = rng.gen_range(0..self.links.len());
 
         if delta_w == 0.0 {
             // --- weights frozen: do phase update only ---
