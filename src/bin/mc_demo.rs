@@ -1,4 +1,6 @@
 use rc_sim::graph::Graph;
+use std::fs::File;
+use std::io::Write;
 
 fn main() {
     // Simulation parameters
@@ -8,6 +10,17 @@ fn main() {
     let delta_theta    = 0.20;
     let n_steps: usize = 10_000;
     let report_every   = 1_000;
+
+    // ----------------------------------------------------------
+    // CSV output
+    // ----------------------------------------------------------
+    let mut csv = File::create("mc_observables.csv")
+        .expect("cannot create mc_observables.csv");
+
+    writeln!(
+        csv,
+        "step,accept_rate,avg_w,avg_cos_theta,S_entropy,S_triangle,action"
+    ).unwrap();
 
     // Counters
     let mut accepted = 0;
@@ -41,6 +54,19 @@ fn main() {
                 s_tri,
                 total_a,
             );
+
+            writeln!(
+                csv,
+                "{},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5}",
+                step,
+                acc_rate,
+                avg_w,
+                avg_cos,
+                s_entropy,
+                s_tri,
+                total_a,
+            ).unwrap();
+
         }
     }
 }
