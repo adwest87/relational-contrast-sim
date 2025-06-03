@@ -14,7 +14,9 @@ fn test_entropy_on_two_nodes() {
                    [0.0, 1.0, 0.0],
                    [0.0, 0.0, 1.0]],
     }];
-    let g = Graph { nodes, links };
+    let dt = 1.0;
+    let g = Graph { nodes, links, dt };
+
 
     let expected = w * w.ln();             // only one link
     let action   = g.entropy_action();
