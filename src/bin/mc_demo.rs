@@ -49,6 +49,11 @@ fn main() {
         "step,accept_rate,delta_theta,avg_w,avg_cos_theta,S_entropy,S_triangle,action"
     ).unwrap();
 
+    let mut theta_csv = File::create("theta_final.csv")
+        .expect("cannot create theta_final.csv");
+    writeln!(theta_csv, "link_i,link_j,theta").unwrap();
+
+
     // Counters
     let mut accepted_count = 0;
 
@@ -68,18 +73,16 @@ fn main() {
         if step % report_every == 0 {
             // ---- observables ---------------------------------------
             let avg_w: f64 = g.sum_weights() / g.m() as f64;
-            let avg_cos: f64 =
-                g.links.iter().map(|l| l.theta.cos()).sum::<f64>() / g.m() as f64;
+            let avg_cos: f64 = g.links.iter().map(|l| l.theta.cos()).sum::<f64>() / g.m() as f64;
             let s_entropy = g.entropy_action();
             let s_tri     = g.triangle_action(1.0); // α = 1
             let total_a   = g.action();
             let acc_rate = accepted_count as f64 / step as f64;
 
             println!(
-                "{:>6} {acc:>5.2}%  δw={:>6.3}  δθ={:>6.3}  ⟨w⟩={:>6.3}  ⟨cosθ⟩={:>6.3}  SΔ={:>8.2}  Sₑ={:>8.2}  A={:>8.2}",
+                "{:>6} {acc:>5.2}%  δθ={:>6.3}  ⟨cosθ⟩={:>6.3}  SΔ={:>8.2}  Sₑ={:>8.2}  A={:>8.2}",
                 step,
                 tuner_th.delta,
-                avg_w,
                 avg_cos,
                 s_tri,
                 s_entropy,
@@ -104,4 +107,13 @@ fn main() {
 
         }
     }
+
+    // --------------------------------------------
+    // Save final θ for every link
+    // --------------------------------------------
+    for link in &g.links {
+        writeln!(theta_csv, "{},{},{}", link.i, link.j, link.theta).unwrap();
+    }
+    println!("Saved final U(1) phases to theta_final.csv");
+
 }
