@@ -4,12 +4,12 @@ use rc_sim::graph::Graph;
 fn test_metropolis_acceptance_rate() {
     let mut g = Graph::complete_random(8);
     let beta  = 1.0;
-    let delta = 0.1;
+    let delta_w     = 0.1;
+    let delta_theta = 0.2;
     let n_steps = 1000;
-
     let mut accepted = 0;
     for _ in 0..n_steps {
-        if g.metropolis_step(beta, delta) {
+        if g.metropolis_step(beta, delta_w, delta_theta) {
             accepted += 1;
         }
     }
@@ -19,6 +19,5 @@ fn test_metropolis_acceptance_rate() {
         (0.01..=1.0).contains(&acc_rate),
         "Acceptance rate {} out of plausible range", acc_rate
     );
-
 }
 

@@ -9,10 +9,8 @@ fn test_entropy_on_two_nodes() {
         i: 0,
         j: 1,
         w,
+        theta: 0.0,
         tensor: [[[0.0; 3]; 3]; 3],        // dummy tensor, not used here
-        holonomy: [[1.0, 0.0, 0.0],
-                   [0.0, 1.0, 0.0],
-                   [0.0, 0.0, 1.0]],
     }];
     let dt = 1.0;
     let g = Graph { nodes, links, dt };
