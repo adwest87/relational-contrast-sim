@@ -3,6 +3,7 @@
 //! • Link: unordered pair (i, j) with weight w
 use crate::projector::{aib_project, frobenius_norm};
 use rand::Rng;
+use rand::distributions::{Distribution, Uniform};
 
 /// One vertex in the network
 #[derive(Debug, Clone)]
@@ -25,6 +26,7 @@ pub struct Link {
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
+    pub dt: f64,
 }
 
 fn random_tensor(rng: &mut impl Rng) -> [[[f64; 3]; 3]; 3] {
@@ -51,7 +53,6 @@ impl Graph {
     /// weights w ∈ (0, 1].
     pub fn complete_random(n: usize) -> Self {
         let mut rng = rand::thread_rng();
-
         let nodes = (0..n).map(|id| Node { id }).collect();
 
         let mut links = Vec::new();
@@ -67,8 +68,11 @@ impl Graph {
             }
         }
 
-        Self { nodes, links }
+        let dt = 1.0;               // default time increment
+
+        Self { nodes, links, dt }
     }
+
     /// Project every link tensor with the AIB projector.
     /// Returns the total Frobenius norm *before* and *after* so you
     /// can see how much content was removed.
@@ -107,5 +111,123 @@ impl Graph {
         for link in &mut self.links {
             link.w *= lambda;
         }
+    }
+    /// Sum of all link weights  Σ w
+    pub fn sum_weights(&self) -> f64 {
+        self.links.iter().map(|l| l.w).sum()
+    }
+
+    /// The Dougal-invariant combination
+    /// I = (S - ln(dt) Σ w) / dt
+    pub fn invariant_action(&self) -> f64 {
+        let s = self.entropy_action();
+        let sum_w = self.sum_weights();
+        (s - self.dt.ln() * sum_w) / self.dt
+    }
+
+    /// Rescale all weights *and* dt by λ  (Dougal transformation)
+    pub fn rescale(&mut self, lambda: f64) {
+        for link in &mut self.links {
+            link.w *= lambda;
+        }
+        self.dt *= lambda;
+    }
+    /// Current action. For now this is just the Dougal-invariant
+    /// entropy combination. Later you'll add holonomy, projector, etc.
+    pub fn action(&self) -> f64 {
+        let i_term = self.invariant_action();
+        let triangle_term = self.triangle_action(1.0); // α = 1 for now
+        i_term + triangle_term
+    }
+
+    /// Propose: pick one link at random and multiply its weight by e^{ε},
+    /// where ε ~ U[-δ, +δ]. Returns (link_index, old_w, new_w).
+    pub fn propose_weight_update(&mut self, delta: f64) -> (usize, f64, f64) {
+        let mut rng = rand::thread_rng();
+        let link_index = rng.gen_range(0..self.links.len());
+
+        // perturbation
+        let eps: f64 = Uniform::new_inclusive(-delta, delta).sample(&mut rng);
+        let old_w = self.links[link_index].w;
+        let new_w = old_w * eps.exp();
+
+        self.links[link_index].w = new_w;
+        (link_index, old_w, new_w)
+    }
+    /// Perform one Metropolis step at inverse temperature β.
+    /// Picks a random link, perturbs its weight, and accepts/rejects.
+    pub fn metropolis_step(&mut self, beta: f64, delta: f64) -> bool {
+
+        // current action
+        let s_before = self.action();
+
+        // propose update
+        let (idx, old_w, _) = self.propose_weight_update(delta);
+
+        let s_after = self.action();
+        let delta_s = s_after - s_before;
+
+        let accept = if delta_s <= 0.0 {
+            true
+        } else {
+            let mut rng = rand::thread_rng();
+            rng.gen_range(0.0..1.0) < (-beta * delta_s).exp()
+        };
+
+        if !accept {
+            // revert the change
+            self.links[idx].w = old_w;
+        }
+        accept
+    }
+    /// Iterate over all unordered triangles (i < j < k).
+    pub fn triangles(&self) -> impl Iterator<Item = (usize, usize, usize)> + '_ {   
+        let n = self.n();
+        (0..n).flat_map(move |i| {
+            ((i + 1)..n).flat_map(move |j| {
+                ((j + 1)..n).map(move |k| (i, j, k))
+            })
+        })
+    }
+    /// Triangle term  S_Δ  with coefficient α
+    pub fn triangle_action(&self, alpha: f64) -> f64 {
+        let mut sum = 0.0;
+        for (i, j, k) in self.triangles() {
+            let h_ij = &self.links[self.link_index(i, j)].holonomy;
+            let h_jk = &self.links[self.link_index(j, k)].holonomy;
+            let h_ki = &self.links[self.link_index(k, i)].holonomy;
+
+            // Multiply 3×3 matrices: h_ij * h_jk
+            let mut prod = [[0.0; 3]; 3];
+            for a in 0..3 {
+                for b in 0..3 {
+                    for c in 0..3 {
+                        prod[a][b] += h_ij[a][c] * h_jk[c][b];
+                    }
+                }
+            }
+            // prod * h_ki
+            let mut loop_mat = [[0.0; 3]; 3];
+            for a in 0..3 {
+                for b in 0..3 {
+                    for c in 0..3 {
+                        loop_mat[a][b] += prod[a][c] * h_ki[c][b];
+                    }
+                }
+            }
+
+            // Real trace (matrix is real anyway)
+            let trace = loop_mat[0][0] + loop_mat[1][1] + loop_mat[2][2];
+            sum += trace;
+        }
+        alpha * sum
+    }
+    /// Return the index in self.links for the unordered pair (i,j)
+    fn link_index(&self, i: usize, j: usize) -> usize {
+        // Works only for complete graph with ordering i<j.
+        // index = i*(n-1) - i*(i+1)/2 + (j-i-1)
+        let n = self.n();
+        let (i, j) = if i < j { (i, j) } else { (j, i) };
+        i * (n - 1) - (i * (i + 1)) / 2 + (j - i - 1)
     }
 }    
