@@ -15,10 +15,11 @@ pub struct Node {
 pub struct Link {
     pub i: usize,
     pub j: usize,
-    pub w: f64,                              // weight
-    pub tensor: [[[f64; 3]; 3]; 3],          // raw 3×3×3 data
-    pub holonomy: [[f64; 3]; 3],             // 3×3 gauge matrix (placeholder)
+    pub w: f64,                // weight
+    pub theta: f64,            // NEW: U(1) phase angle
+    pub tensor: [[[f64; 3]; 3]; 3],
 }
+
 
 
 /// A simple undirected graph
@@ -41,14 +42,33 @@ fn random_tensor(rng: &mut impl Rng) -> [[[f64; 3]; 3]; 3] {
     t
 }
 
-fn identity_matrix() -> [[f64; 3]; 3] {
-    [[1.0, 0.0, 0.0],
-     [0.0, 1.0, 0.0],
-     [0.0, 0.0, 1.0]]
+#[derive(Debug)]
+pub enum Proposal {
+    Weight { idx: usize, old: f64 },
+    Phase  { idx: usize, old: f64 },
 }
 
 
 impl Graph {
+    pub fn propose_update(&mut self, delta_w: f64, delta_theta: f64) -> Proposal {
+        let mut rng = rand::thread_rng();
+        let link_index = rng.gen_range(0..self.links.len());
+
+        if rng.gen_bool(0.5) {
+            // Weight update
+            let eps: f64 = Uniform::new_inclusive(-delta_w, delta_w).sample(&mut rng);
+            let old = self.links[link_index].w;
+            self.links[link_index].w = old * eps.exp();
+            Proposal::Weight { idx: link_index, old }
+        } else {
+            // Phase update
+            let dtheta: f64 = Uniform::new_inclusive(-delta_theta, delta_theta).sample(&mut rng);
+            let old = self.links[link_index].theta;
+            self.links[link_index].theta = old + dtheta;
+            Proposal::Phase { idx: link_index, old }
+        }
+    }
+
     /// Construct a complete graph on `n` nodes with random
     /// weights w ∈ (0, 1].
     pub fn complete_random(n: usize) -> Self {
@@ -62,8 +82,8 @@ impl Graph {
                     i,
                     j,
                     w: rng.gen_range(0.000_001..=1.0),
+                    theta: rng.gen_range(-std::f64::consts::PI..=std::f64::consts::PI),
                     tensor: random_tensor(&mut rng),
-                    holonomy: identity_matrix(),
                 });
             }
         }
@@ -156,30 +176,28 @@ impl Graph {
     }
     /// Perform one Metropolis step at inverse temperature β.
     /// Picks a random link, perturbs its weight, and accepts/rejects.
-    pub fn metropolis_step(&mut self, beta: f64, delta: f64) -> bool {
-
-        // current action
+    pub fn metropolis_step(&mut self, beta: f64, delta_w: f64, delta_theta: f64) -> bool {
         let s_before = self.action();
 
-        // propose update
-        let (idx, old_w, _) = self.propose_weight_update(delta);
+        let proposal = self.propose_update(delta_w, delta_theta);
 
         let s_after = self.action();
         let delta_s = s_after - s_before;
 
-        let accept = if delta_s <= 0.0 {
-            true
-        } else {
+        let accept = delta_s <= 0.0 || {
             let mut rng = rand::thread_rng();
             rng.gen_range(0.0..1.0) < (-beta * delta_s).exp()
         };
 
         if !accept {
-            // revert the change
-            self.links[idx].w = old_w;
+            match proposal {
+                Proposal::Weight { idx, old } => self.links[idx].w = old,
+                Proposal::Phase  { idx, old } => self.links[idx].theta = old,
+            }
         }
         accept
     }
+
     /// Iterate over all unordered triangles (i < j < k).
     pub fn triangles(&self) -> impl Iterator<Item = (usize, usize, usize)> + '_ {   
         let n = self.n();
@@ -193,35 +211,18 @@ impl Graph {
     pub fn triangle_action(&self, alpha: f64) -> f64 {
         let mut sum = 0.0;
         for (i, j, k) in self.triangles() {
-            let h_ij = &self.links[self.link_index(i, j)].holonomy;
-            let h_jk = &self.links[self.link_index(j, k)].holonomy;
-            let h_ki = &self.links[self.link_index(k, i)].holonomy;
+            let t_ij = self.links[self.link_index(i, j)].theta;
+            let t_jk = self.links[self.link_index(j, k)].theta;
+            let t_ki = self.links[self.link_index(k, i)].theta;
 
-            // Multiply 3×3 matrices: h_ij * h_jk
-            let mut prod = [[0.0; 3]; 3];
-            for a in 0..3 {
-                for b in 0..3 {
-                    for c in 0..3 {
-                        prod[a][b] += h_ij[a][c] * h_jk[c][b];
-                    }
-                }
-            }
-            // prod * h_ki
-            let mut loop_mat = [[0.0; 3]; 3];
-            for a in 0..3 {
-                for b in 0..3 {
-                    for c in 0..3 {
-                        loop_mat[a][b] += prod[a][c] * h_ki[c][b];
-                    }
-                }
-            }
+            let loop_theta = t_ij + t_jk + t_ki;
+            let trace = 3.0 * loop_theta.cos();
 
-            // Real trace (matrix is real anyway)
-            let trace = loop_mat[0][0] + loop_mat[1][1] + loop_mat[2][2];
             sum += trace;
         }
         alpha * sum
     }
+
     /// Return the index in self.links for the unordered pair (i,j)
     fn link_index(&self, i: usize, j: usize) -> usize {
         // Works only for complete graph with ordering i<j.
