@@ -34,6 +34,7 @@ fn main() {
     // Simulation parameters
     let mut g          = Graph::complete_random(8);
     let beta           = 1.0;
+    let mut tuner_w    = Tuner::new(0.10, 200, 0.30, 0.05);   // weight tuner
     let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);   // start δθ=0.20
     let n_steps: usize = 10_000;
     let report_every   = 1_000;
@@ -46,8 +47,9 @@ fn main() {
 
     writeln!(
         csv,
-        "step,accept_rate,delta_theta,avg_w,avg_cos_theta,S_entropy,S_triangle,action"
+        "step,accept_rate,delta_w,delta_theta,avg_w,avg_cos_theta,S_entropy,S_triangle,action"
     ).unwrap();
+
 
     let mut theta_csv = File::create("theta_final.csv")
         .expect("cannot create theta_final.csv");
@@ -63,10 +65,11 @@ fn main() {
     );
 
     for step in 1..=n_steps {
-        let accepted = g.metropolis_step(beta, 0.0, tuner_th.delta);
+        let accepted = g.metropolis_step(beta, tuner_w.delta, tuner_th.delta);
         if accepted {
             accepted_count += 1;
         }
+        tuner_w.update(accepted);
         tuner_th.update(accepted);
 
 
@@ -80,9 +83,11 @@ fn main() {
             let acc_rate = accepted_count as f64 / step as f64;
 
             println!(
-                "{:>6} {acc:>5.2}%  δθ={:>6.3}  ⟨cosθ⟩={:>6.3}  SΔ={:>8.2}  Sₑ={:>8.2}  A={:>8.2}",
+                "{:>6} {acc:>5.2}%  δw={:>6.3}  δθ={:>6.3}  ⟨w⟩={:>6.3}  ⟨cosθ⟩={:>6.3}  SΔ={:>8.2}  Sₑ={:>8.2}  A={:>8.2}",
                 step,
+                tuner_w.delta,
                 tuner_th.delta,
+                avg_w,
                 avg_cos,
                 s_tri,
                 s_entropy,
@@ -93,9 +98,10 @@ fn main() {
 
             writeln!(
                 csv,
-                "{},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5}",
+                "{},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5},{:.5}",
                 step,
                 acc_rate,
+                tuner_w.delta,
                 tuner_th.delta,
                 avg_w,
                 avg_cos,
