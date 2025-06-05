@@ -28,6 +28,7 @@ pub struct Graph {
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
     pub dt: f64,
+    triangles: Vec<(usize, usize, usize)>,
 }
 
 fn random_tensor(rng: &mut impl Rng) -> [[[f64; 3]; 3]; 3] {
@@ -96,7 +97,17 @@ impl Graph {
 
         let dt = 1.0;               // default time increment
 
-        Self { nodes, links, dt }
+        // Precompute triangle list (i < j < k)
+        let mut triangles = Vec::new();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                for k in (j + 1)..n {
+                    triangles.push((i, j, k));
+                }
+            }
+        }
+
+        Self { nodes, links, dt, triangles }
     }
 
     /// Project every link tensor with the AIB projector.
@@ -205,13 +216,8 @@ impl Graph {
     }
 
     /// Iterate over all unordered triangles (i < j < k).
-    pub fn triangles(&self) -> impl Iterator<Item = (usize, usize, usize)> + '_ {   
-        let n = self.n();
-        (0..n).flat_map(move |i| {
-            ((i + 1)..n).flat_map(move |j| {
-                ((j + 1)..n).map(move |k| (i, j, k))
-            })
-        })
+    pub fn triangles(&self) -> impl Iterator<Item = (usize, usize, usize)> + '_ {
+        self.triangles.iter().copied()
     }
     /// Triangle term  S_Δ  with coefficient α
     pub fn triangle_action(&self, alpha: f64) -> f64 {
