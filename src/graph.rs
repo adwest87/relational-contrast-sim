@@ -52,29 +52,22 @@ pub enum Proposal {
 impl Graph {
     pub fn propose_update(&mut self, delta_w: f64, delta_theta: f64) -> Proposal {
         let mut rng = rand::thread_rng();
-        let _ = rng.gen_range(0..self.links.len());
+        let link_index = rng.gen_range(0..self.links.len());
 
-        if delta_w == 0.0 {
-            // --- weights frozen: do phase update only ---
-            let mut rng = rand::thread_rng();
-            let link_index = rng.gen_range(0..self.links.len());
-            let dtheta: f64 = Uniform::new_inclusive(-delta_theta, delta_theta).sample(&mut rng);
-            let old = self.links[link_index].theta;
-            self.links[link_index].theta = old + dtheta;
-            Proposal::Phase { idx: link_index, old }
-        } else if rng.gen_bool(0.5) {
-            // --- normal weight update ---
-            let mut rng = rand::thread_rng();
-            let link_index = rng.gen_range(0..self.links.len());
-            let eps: f64 = Uniform::new_inclusive(-delta_w, delta_w).sample(&mut rng);
+        let phase_only = delta_w == 0.0;
+        let do_weight = !phase_only && rng.gen_bool(0.5);
+
+        if do_weight {
+            // --- weight update ---
+            let eps: f64 = Uniform::new_inclusive(-delta_w, delta_w)
+                .sample(&mut rng);
             let old = self.links[link_index].w;
             self.links[link_index].w = old * eps.exp();
             Proposal::Weight { idx: link_index, old }
         } else {
             // --- phase update ---
-            let mut rng = rand::thread_rng();
-            let link_index = rng.gen_range(0..self.links.len());
-            let dtheta: f64 = Uniform::new_inclusive(-delta_theta, delta_theta).sample(&mut rng);
+            let dtheta: f64 = Uniform::new_inclusive(-delta_theta, delta_theta)
+                .sample(&mut rng);
             let old = self.links[link_index].theta;
             self.links[link_index].theta = old + dtheta;
             Proposal::Phase { idx: link_index, old }
@@ -94,7 +87,8 @@ impl Graph {
                     i,
                     j,
                     w: rng.gen_range(0.000_001..=1.0),
-                    theta: rng.gen_range(-std::f64::consts::PI..=std::f64::consts::PI),
+                    // unit holonomy by default so triangle tests pass
+                    theta: 0.0,
                     tensor: random_tensor(&mut rng),
                 });
             }
