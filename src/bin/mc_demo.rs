@@ -1,6 +1,8 @@
 use rc_sim::graph::Graph;
 use std::fs::File;
 use std::io::Write;
+use rc_sim::measure::Recorder;
+
 
 /// Simple proportional tuner for proposal widths
 struct Tuner {
@@ -36,14 +38,17 @@ fn main() {
     let beta           = 1.0;
     let mut tuner_w    = Tuner::new(0.10, 200, 0.30, 0.05);   // weight tuner
     let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);   // start δθ=0.20
-    let n_steps: usize = 10_000;
+    let n_steps: usize = 100_000;
     let report_every   = 1_000;
+    let equil_steps = 20_000; // or 100_000 depending on your total sweeps
+
 
     // ----------------------------------------------------------
     // CSV output
     // ----------------------------------------------------------
     let mut csv = File::create("mc_observables.csv")
         .expect("cannot create mc_observables.csv");
+    let mut recorder = Recorder::default();
 
     writeln!(
         csv,
@@ -72,6 +77,9 @@ fn main() {
         tuner_w.update(accepted);
         tuner_th.update(accepted);
 
+        if step >= equil_steps {
+            recorder.push(&g.links);
+        }
 
         if step % report_every == 0 {
             // ---- observables ---------------------------------------
@@ -122,4 +130,11 @@ fn main() {
     }
     println!("Saved final U(1) phases to theta_final.csv");
 
+    use std::fs::File;
+    use std::io::Write;
+
+    let mut file = File::create("timeseries_cos.csv").expect("cannot create file");
+    for val in &recorder.cos_theta {
+        writeln!(file, "{val}").unwrap();
+    }
 }

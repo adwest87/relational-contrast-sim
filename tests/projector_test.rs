@@ -1,4 +1,4 @@
-use rc_sim::projector::{count_nonzero_components};
+//use rc_sim::projector::{count_nonzero_components};
 use rc_sim::projector::{aib_project, frobenius_norm, flatten};
 use rand::Rng;
 use nalgebra::DMatrix;
@@ -95,7 +95,7 @@ fn test_norm_reduces() {
 }
 
 
-#[test]
+//#[test]
 //fn test_projector_leaves_20_dof() {
 //    let mut rng = rand::thread_rng();
 //    let mut t = [[[0.0; 3]; 3]; 3];

@@ -14,6 +14,8 @@ use std::fs::File;
 use std::io::Write;
 use rand::rngs::StdRng;
 use rand::{SeedableRng, Rng};
+use rc_sim::measure::Recorder;
+
 
 // ---------- Welford online mean & variance ----------
 #[derive(Default, Clone)]
@@ -36,14 +38,19 @@ impl OnlineStats {
 
 fn main() {
     // ---- scan parameters ----------------------------------------
-    let n_nodes       = 16;                               // bigger lattice
-    let links_per_g   = n_nodes * (n_nodes - 1) / 2;      // 120
-    let n_steps       = 50_000;
-    let equil_steps   = 20_000;
-    let beta_vals: Vec<f64> = (5..=50).map(|i| 0.5 + 0.1 * i as f64).collect(); // 0.5 .. 5.0
+    let n_nodes       = 24;                               // bigger lattice
+    let links_per = n_nodes * (n_nodes - 1) / 2;   // 276 for 24 nodes
+    let n_steps       = 200_000;
+    let equil_steps   = 80_000;
+    let beta_vals: Vec<f64> = (120..=150)          // 120 → 2.4   150 → 3.0
+        .map(|i| 0.02 * i as f64)
+        .collect();
     let n_rep         = 5;                                // replicas
     let alpha         = 1.0;
+    
+
     // -------------------------------------------------------------
+    let mut recorder = Recorder::default();
 
     let mut csv = File::create("scan_results.csv")
         .expect("cannot create scan_results.csv");
@@ -78,6 +85,11 @@ fn main() {
                 tuner_w.update(accepted);
                 tuner_th.update(accepted);
 
+                if step >= equil_steps {
+                    recorder.push(&g.links);
+                }
+
+
                 // collect measurements only after equilibration
                 if step > equil_steps {
                     let avg_w   = g.sum_weights() / g.m() as f64;
@@ -95,7 +107,7 @@ fn main() {
             );
         }
 
-        let chi = links_per_g as f64 * stats_cos.var();
+        let chi = links_per as f64 * stats_cos.var();
 
         writeln!(
             csv,
@@ -108,7 +120,17 @@ fn main() {
         ).unwrap();
     }
     println!("Scan complete → scan_results.csv");
+
+    use std::fs::File;
+    use std::io::Write;
+
+    let mut file = File::create("timeseries_cos.csv").expect("cannot create file");
+    for val in &recorder.cos_theta {
+        writeln!(file, "{val}").unwrap();
+    }
 }
+
+
 
 // ---------- same little Tuner struct as before ----------
 struct Tuner { delta: f64, acc: usize, win: usize, tgt: f64, band: f64 }
