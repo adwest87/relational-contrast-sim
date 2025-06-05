@@ -64,6 +64,17 @@ pub fn aib_project(t: [[[f64; 3]; 3]; 3]) -> [[[f64; 3]; 3]; 3] {
     }
     result
 }
+pub fn frobenius_norm(t: &[[[f64; 3]; 3]; 3]) -> f64 {
+    let mut sum = 0.0;
+    for a in 0..3 {
+        for b in 0..3 {
+            for c in 0..3 {
+                sum += t[a][b][c] * t[a][b][c];
+            }
+        }
+    }
+    sum.sqrt()
+}
 
 fn kronecker(i: usize, j: usize) -> f64 {
     if i == j { 1.0 } else { 0.0 }
@@ -75,4 +86,30 @@ fn levi_civita(i: usize, j: usize, k: usize) -> f64 {
         (0, 2, 1) | (2, 1, 0) | (1, 0, 2) => -1.0,
         _ => 0.0,
     }
+}
+pub fn count_nonzero_components(t: &[[[f64; 3]; 3]; 3]) -> usize {
+    let mut count = 0;
+    for a in 0..3 {
+        for b in 0..3 {
+            for c in 0..3 {
+                if t[a][b][c].abs() > 1e-10 {
+                    count += 1;
+                }
+            }
+        }
+    }
+    count
+}
+pub fn flatten(t: &[[[f64; 3]; 3]; 3]) -> [f64; 27] {
+    let mut v = [0.0; 27];
+    let mut k = 0;
+    for a in 0..3 {
+        for b in 0..3 {
+            for c in 0..3 {
+                v[k] = t[a][b][c];
+                k += 1;
+            }
+        }
+    }
+    v
 }

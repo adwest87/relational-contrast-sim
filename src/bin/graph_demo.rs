@@ -17,6 +17,7 @@ fn main() {
     let expected  = lambda * s_before + lambda * sum_w * lambda.ln();
     println!("  S(λw)        = {:.6}", s_after);
     println!("  Expected     = {:.6}", expected);
-
+    println!("Dougal-invariant action  I  = {:.5}", g.invariant_action());
+    println!("Triangle term  S_Δ = {:.5}", g.triangle_action(1.0));
 }
 
