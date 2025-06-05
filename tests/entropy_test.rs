@@ -1,19 +1,12 @@
-use rc_sim::graph::{Graph, Link, Node};
+use rc_sim::graph::Graph;
 
 #[test]
 fn test_entropy_on_two_nodes() {
     // Build a 2-node graph manually so we know the answer exactly
-    let nodes = vec![Node { id: 0 }, Node { id: 1 }];
-    let w = 0.5_f64;                       // weight
-    let links = vec![Link {
-        i: 0,
-        j: 1,
-        w,
-        theta: 0.0,
-        tensor: [[[0.0; 3]; 3]; 3],        // dummy tensor, not used here
-    }];
-    let dt = 1.0;
-    let g = Graph { nodes, links, dt };
+    let mut g = Graph::complete_random(2);
+    g.links[0].w = 0.5;
+    g.links[0].tensor = [[[0.0; 3]; 3]; 3];
+    let w = g.links[0].w;
 
 
     let expected = w * w.ln();             // only one link
