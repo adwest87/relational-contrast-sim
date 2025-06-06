@@ -13,8 +13,8 @@ use rc_sim::graph::Graph;
 use std::fs::File;
 use std::io::Write;
 use rand::rngs::StdRng;
-use rand::{SeedableRng, Rng};
-use rc_sim::measure::Recorder;
+use rand::SeedableRng;
+use rayon::prelude::*;
 
 
 // ---------- Welford online mean & variance ----------
@@ -45,12 +45,54 @@ fn main() {
     let beta_vals: Vec<f64> = (120..=150)          // 120 → 2.4   150 → 3.0
         .map(|i| 0.02 * i as f64)
         .collect();
+    let alpha_vals: Vec<f64> = (0..=20).map(|i| 0.1 * i as f64).collect();
     let n_rep         = 5;                                // replicas
-    let alpha         = 1.0;
-    
 
     // -------------------------------------------------------------
-    let mut recorder = Recorder::default();
+    let results = std::sync::Mutex::new(Vec::new());
+
+    beta_vals.par_iter().for_each(|&beta| {
+        for &alpha in &alpha_vals {
+            let mut stats_w   = OnlineStats::default();
+            let mut stats_cos = OnlineStats::default();
+
+            for rep in 0..n_rep {
+                let seed = [rep as u8; 32];
+                let mut _rng: StdRng = SeedableRng::from_seed(seed);
+                let mut g = Graph::complete_random(n_nodes);
+
+                let mut tuner_w  = Tuner::new(0.10, 200, 0.30, 0.05);
+                let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);
+
+                for step in 1..=n_steps {
+                    let accepted = g.metropolis_step(beta, alpha, tuner_w.delta, tuner_th.delta);
+                    tuner_w.update(accepted);
+                    tuner_th.update(accepted);
+
+                    if step > equil_steps {
+                        let avg_w   = g.sum_weights() / g.m() as f64;
+                        let avg_cos = g.links.iter()
+                            .map(|l| l.theta.cos())
+                            .sum::<f64>() / g.m() as f64;
+
+                        stats_w.push(avg_w);
+                        stats_cos.push(avg_cos);
+                    }
+                }
+            }
+
+            let chi = links_per as f64 * stats_cos.var();
+            let line = format!(
+                "{:.2},{:.2},{:.6},{:.6},{:.6},{:.6},{:.6}",
+                beta,
+                alpha,
+                stats_w.mean(), stats_w.var().sqrt(),
+                stats_cos.mean(), stats_cos.var().sqrt(),
+                chi
+            );
+            results.lock().unwrap().push(line);
+        }
+    });
 
     let mut csv = File::create("scan_results.csv")
         .expect("cannot create scan_results.csv");
@@ -58,76 +100,10 @@ fn main() {
         csv,
         "beta,alpha,mean_w,std_w,mean_cos,std_cos,susceptibility"
     ).unwrap();
-
-    println!("# β-scan  N_nodes={n_nodes}  steps={n_steps}  replicas={n_rep}");
-
-    for &beta in &beta_vals {
-        // accumulators over replicas
-        let mut stats_w   = OnlineStats::default();
-        let mut stats_cos = OnlineStats::default();
-
-        for rep in 0..n_rep {
-            // deterministic seed so runs are reproducible
-            let seed = [rep as u8; 32];
-            let mut rng: StdRng = SeedableRng::from_seed(seed);
-            let mut g = Graph::complete_random(n_nodes);
-
-            // local tuners
-            let mut tuner_w  = Tuner::new(0.10, 200, 0.30, 0.05);
-            let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);
-
-            for step in 1..=n_steps {
-                let accepted = g.metropolis_step(
-                    beta,
-                    tuner_w.delta,
-                    tuner_th.delta,
-                );
-                tuner_w.update(accepted);
-                tuner_th.update(accepted);
-
-                if step >= equil_steps {
-                    recorder.push(&g.links);
-                }
-
-
-                // collect measurements only after equilibration
-                if step > equil_steps {
-                    let avg_w   = g.sum_weights() / g.m() as f64;
-                    let avg_cos = g.links.iter()
-                        .map(|l| l.theta.cos())
-                        .sum::<f64>() / g.m() as f64;
-
-                    stats_w.push(avg_w);
-                    stats_cos.push(avg_cos);
-                }
-            }
-            println!(
-                "β={beta:>4.1}  rep {rep} done  ⟨w⟩={:.3}  ⟨cosθ⟩={:.3}",
-                stats_w.mean(), stats_cos.mean()
-            );
-        }
-
-        let chi = links_per as f64 * stats_cos.var();
-
-        writeln!(
-            csv,
-            "{:.2},{:.2},{:.6},{:.6},{:.6},{:.6},{:.6}",
-            beta,
-            alpha,
-            stats_w.mean(), stats_w.var().sqrt(),
-            stats_cos.mean(), stats_cos.var().sqrt(),
-            chi
-        ).unwrap();
+    for line in results.into_inner().unwrap() {
+        writeln!(csv, "{line}").unwrap();
     }
     println!("Scan complete → scan_results.csv");
-
-    use std::fs::File;
-    use std::io::Write;
-
-    let mut file = File::create("timeseries_cos.csv").expect("cannot create file");
-    for val in &recorder.cos_theta {
-        writeln!(file, "{val}").unwrap();
-    }
 }
 
 
