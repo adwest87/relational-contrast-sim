@@ -169,11 +169,12 @@ impl Graph {
         }
         self.dt *= lambda;
     }
-    /// Current action. For now this is just the Dougal-invariant
-    /// entropy combination. Later you'll add holonomy, projector, etc.
-    pub fn action(&self) -> f64 {
+    /// Current action given a triangle coupling `alpha`.
+    /// For now this is the Dougal-invariant entropy term plus
+    /// the triangle contribution.
+    pub fn action(&self, alpha: f64) -> f64 {
         let i_term = self.invariant_action();
-        let triangle_term = self.triangle_action(1.0); // α = 1 for now
+        let triangle_term = self.triangle_action(alpha);
         i_term + triangle_term
     }
 
@@ -193,12 +194,12 @@ impl Graph {
     }
     /// Perform one Metropolis step at inverse temperature β.
     /// Picks a random link, perturbs its weight, and accepts/rejects.
-    pub fn metropolis_step(&mut self, beta: f64, delta_w: f64, delta_theta: f64) -> bool {
-        let s_before = self.action();
+    pub fn metropolis_step(&mut self, beta: f64, alpha: f64, delta_w: f64, delta_theta: f64) -> bool {
+        let s_before = self.action(alpha);
 
         let proposal = self.propose_update(delta_w, delta_theta);
 
-        let s_after = self.action();
+        let s_after = self.action(alpha);
         let delta_s = s_after - s_before;
 
         let accept = delta_s <= 0.0 || {

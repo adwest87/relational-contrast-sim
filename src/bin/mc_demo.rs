@@ -36,6 +36,7 @@ fn main() {
     // Simulation parameters
     let mut g          = Graph::complete_random(8);
     let beta           = 1.0;
+    let alpha          = 1.0;
     let mut tuner_w    = Tuner::new(0.10, 200, 0.30, 0.05);   // weight tuner
     let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);   // start δθ=0.20
     let n_steps: usize = 100_000;
@@ -70,7 +71,7 @@ fn main() {
     );
 
     for step in 1..=n_steps {
-        let accepted = g.metropolis_step(beta, tuner_w.delta, tuner_th.delta);
+        let accepted = g.metropolis_step(beta, alpha, tuner_w.delta, tuner_th.delta);
         if accepted {
             accepted_count += 1;
         }
@@ -86,8 +87,8 @@ fn main() {
             let avg_w: f64 = g.sum_weights() / g.m() as f64;
             let avg_cos: f64 = g.links.iter().map(|l| l.theta.cos()).sum::<f64>() / g.m() as f64;
             let s_entropy = g.entropy_action();
-            let s_tri     = g.triangle_action(1.0); // α = 1
-            let total_a   = g.action();
+            let s_tri     = g.triangle_action(alpha);
+            let total_a   = g.action(alpha);
             let acc_rate = accepted_count as f64 / step as f64;
 
             println!(
@@ -129,9 +130,6 @@ fn main() {
         writeln!(theta_csv, "{},{},{}", link.i, link.j, link.theta).unwrap();
     }
     println!("Saved final U(1) phases to theta_final.csv");
-
-    use std::fs::File;
-    use std::io::Write;
 
     let mut file = File::create("timeseries_cos.csv").expect("cannot create file");
     for val in &recorder.cos_theta {
