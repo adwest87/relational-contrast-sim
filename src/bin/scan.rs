@@ -38,8 +38,8 @@ impl OnlineStats {
 
 fn main() {
     // ---- scan parameters ----------------------------------------
-    let n_nodes       = 24;                               // bigger lattice
-    let links_per = n_nodes * (n_nodes - 1) / 2;   // 276 for 24 nodes
+    let n_nodes       = 48;                               // bigger lattice
+    let links_per = n_nodes * (n_nodes - 1) / 2;   // 1128 for 48 nodes
     let n_steps       = 200_000;
     let equil_steps   = 80_000;
     let beta_vals: Vec<f64> = (120..=150)          // 120 → 2.4   150 → 3.0
