@@ -1,5 +1,5 @@
 use rand::Rng;
-use rc_sim::graph::Graph;
+use crate::graph::Graph;
 
 #[test]
 fn test_dougal_invariant_action() {

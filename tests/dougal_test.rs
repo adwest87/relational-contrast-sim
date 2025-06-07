@@ -1,4 +1,4 @@
-use rc_sim::graph::Graph;
+use crate::graph::Graph;
 
 #[test]
 fn test_entropy_scaling_law() {

@@ -5,7 +5,7 @@
 //
 //  Compile & run:  `cargo run --bin scan`
 
-use rc_sim::graph::{Graph, StepInfo};
+use crate::graph::{Graph, StepInfo};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
