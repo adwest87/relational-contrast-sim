@@ -238,7 +238,7 @@ impl Graph {
         let accept = if delta_s <= 0.0 {
             true
         } else {
-            rng.gen_range(0.0..1.0) < (-beta * delta_s).exp()
+            rng.gen::<f64>() < (-beta * delta_s).exp()
         };
 
         if accept {
