@@ -6,8 +6,7 @@
 
 use crate::projector::{aib_project, frobenius_norm};
 use rand::distributions::{Distribution, Uniform};
-use rand::Rng;
-use rand::{Rng, RngCore};          // `Rng` brings `.gen()` into scope
+use rand::Rng;          // `Rng` brings `.gen()` into scope
 
 /// A vertex in the network.
 #[derive(Debug, Clone)]
