@@ -1,4 +1,4 @@
-use crate::projector::aib_project;
+use scan::projector::aib_project;
 use rand::Rng;               // add rand = "0.8" in Cargo.toml
 
 fn main() {
