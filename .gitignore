@@ -3,3 +3,4 @@
 .ipynb_checkpoints/
 *.csv
 *.svg
+timeseries_cos.csv
