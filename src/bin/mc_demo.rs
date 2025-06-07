@@ -10,7 +10,7 @@
 use scan::graph::{Graph, StepInfo};
 use scan::measure::Recorder;
 
-use rand::{SeedableRng, RngCore};
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use indicatif::{ProgressBar, ProgressStyle};
 use csv::WriterBuilder;
