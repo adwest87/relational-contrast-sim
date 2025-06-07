@@ -7,7 +7,7 @@ use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use csv::WriterBuilder;
-use std::sync::{Mutex, Arc};
+use std::sync::Mutex;
 
 /// Run‑time configuration (single source of truth).
 #[derive(Debug, Clone)]

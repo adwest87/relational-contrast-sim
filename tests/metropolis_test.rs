@@ -2,7 +2,7 @@
 
 use scan::graph::{Graph, StepInfo};
 
-use rand::{SeedableRng, RngCore};
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
 #[test]

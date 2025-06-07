@@ -6,8 +6,9 @@
 //  Compile & run:  `cargo run --bin beta_alpha_scan`
 
 use scan::graph::{Graph, StepInfo};
-use rand::{Rng, RngCore, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use rand::RngCore;
 use rayon::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use csv::WriterBuilder;
