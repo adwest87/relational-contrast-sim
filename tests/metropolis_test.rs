@@ -1,6 +1,6 @@
 //! Unit‑test: basic sanity check on Metropolis acceptance rate.
 
-use rc_sim::graph::{Graph, StepInfo};
+use crate::graph::{Graph, StepInfo};
 
 use rand::{SeedableRng, RngCore};
 use rand_chacha::ChaCha20Rng;

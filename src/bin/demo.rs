@@ -1,4 +1,4 @@
-use rc_sim::projector::aib_project;
+use crate::projector::aib_project;
 use rand::Rng;               // add rand = "0.8" in Cargo.toml
 
 fn main() {

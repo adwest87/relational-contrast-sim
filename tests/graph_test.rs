@@ -1,4 +1,4 @@
-use rc_sim::graph::Graph;
+use crate::graph::Graph;
 
 #[test]
 fn test_complete_graph_sizes() {

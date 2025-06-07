@@ -1,5 +1,5 @@
-//use rc_sim::projector::{count_nonzero_components};
-use rc_sim::projector::{aib_project, frobenius_norm, flatten};
+//use crate::projector::{count_nonzero_components};
+use crate::projector::{aib_project, frobenius_norm, flatten};
 use rand::Rng;
 use nalgebra::DMatrix;
 

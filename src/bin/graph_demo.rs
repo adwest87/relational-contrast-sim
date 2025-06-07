@@ -1,4 +1,4 @@
-use rc_sim::graph::Graph;
+use crate::graph::Graph;
 
 fn main() {
     let mut g = Graph::complete_random(4);
