@@ -18,7 +18,7 @@ use std::sync::Mutex;
 // Configuration
 // -----------------------------------------------------------------------------
 #[derive(Clone, Debug)]
-struct Config {
+struct WideConfig {
     n_nodes:      usize,
     n_steps:      usize,
     equil_steps:  usize,
@@ -30,16 +30,20 @@ struct Config {
     tune_tgt:     f64,
     tune_band:    f64,
 }
-impl Default for Config {
+impl Default for WideConfig {
     fn default() -> Self {
         Self {
-            n_nodes:      12,
-            n_steps:      50_000,
-            equil_steps:  10_000,
+            n_nodes:      24,
+            n_steps:      40_000,
+            equil_steps:  8_000,
             sample_every: 10,
-            beta_vals:    (120..=150).map(|i| 0.02 * i as f64).collect(),   // 2.40 … 3.00
-            alpha_vals:   (0..=20).map(|i| 0.1  * i as f64).collect(),
-            n_rep:        5,
+            beta_vals:    (16..=44)           // 0.8 … 2.2, step 0.05
+                              .map(|i| 0.05 * i as f64)
+                              .collect(),
+            alpha_vals:   (0..=30)
+                              .map(|i| 0.10 * i as f64)
+                              .collect(),
+            n_rep:        2,
             tune_win:     200,
             tune_tgt:     0.30,
             tune_band:    0.05,
@@ -108,7 +112,7 @@ struct Row {
 // Main
 // -----------------------------------------------------------------------------
 fn main() {
-    let cfg = Config::default();
+    let cfg = WideConfig::default();
     println!("Running scan with configuration:\n{cfg:#?}");
 
     let links_per = cfg.n_nodes * (cfg.n_nodes - 1) / 2;
@@ -195,20 +199,21 @@ fn main() {
     // Write CSV
     // ---------------------------------------------------------------------
     let mut wtr = WriterBuilder::new()
-        .from_path("scan_results.csv")
-        .expect("cannot create scan_results.csv");
+        .from_path("scan_wide.csv")   // new name
+        .expect("cannot create scan_wide.csv");
 
     wtr.write_record(&[
-        "beta","alpha","mean_w","std_w",
-        "mean_cos","std_cos","susceptibility"
+    "beta","alpha",
+    //"mean_w","std_w",
+    "mean_cos","std_cos","susceptibility"
     ]).unwrap();
 
     for r in &rows {
         wtr.write_record(&[
             r.beta.to_string(),
             r.alpha.to_string(),
-            r.mean_w.to_string(),
-            r.std_w.to_string(),
+            //r.mean_w.to_string(),
+            //r.std_w.to_string(),
             r.mean_cos.to_string(),
             r.std_cos.to_string(),
             r.chi.to_string(),
@@ -216,5 +221,5 @@ fn main() {
     }
     wtr.flush().unwrap();
 
-    println!("Scan complete → scan_results.csv");
+    println!("Scan complete → scan_wide.csv");
 }
