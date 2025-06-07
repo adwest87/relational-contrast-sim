@@ -1,4 +1,4 @@
-use crate::graph::Graph;
+use scan::graph::Graph;
 
 fn main() {
     let mut g = Graph::complete_random(4);
@@ -12,7 +12,7 @@ fn main() {
     let lambda = 2.0;
     let s_before = g.entropy_action();
     let sum_w: f64 = g.links.iter().map(|l| l.w).sum();
-    g.rescale_weights(lambda);
+    g.rescale(lambda);
     let s_after = g.entropy_action();
     let expected  = lambda * s_before + lambda * sum_w * lambda.ln();
     println!("  S(λw)        = {:.6}", s_after);

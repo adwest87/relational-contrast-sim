@@ -1,5 +1,5 @@
 use rand::Rng;
-use crate::graph::Graph;
+use scan::graph::Graph;
 
 #[test]
 fn test_dougal_invariant_action() {

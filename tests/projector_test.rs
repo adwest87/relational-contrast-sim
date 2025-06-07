@@ -1,5 +1,5 @@
-//use crate::projector::{count_nonzero_components};
-use crate::projector::{aib_project, frobenius_norm, flatten};
+//use scan::projector::{count_nonzero_components};
+use scan::projector::{aib_project, frobenius_norm, flatten};
 use rand::Rng;
 use nalgebra::DMatrix;
 

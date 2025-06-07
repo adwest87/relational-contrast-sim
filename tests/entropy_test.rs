@@ -1,4 +1,4 @@
-use crate::graph::Graph;
+use scan::graph::Graph;
 
 #[test]
 fn test_entropy_on_two_nodes() {

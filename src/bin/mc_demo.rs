@@ -7,8 +7,8 @@
 //!   • writes CSV with the `csv` crate
 //!   • shows a live progress bar with `indicatif`
 
-use crate::graph::{Graph, StepInfo};
-use crate::measure::Recorder;
+use scan::graph::{Graph, StepInfo};
+use scan::measure::Recorder;
 
 use rand::{SeedableRng, RngCore};
 use rand_chacha::ChaCha20Rng;

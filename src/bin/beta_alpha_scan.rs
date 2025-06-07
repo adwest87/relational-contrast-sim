@@ -3,9 +3,9 @@
 //! Parameters are kept in one `Config` struct so comments never
 //! drift out of sync with the executable settings.
 //
-//  Compile & run:  `cargo run --bin scan`
+//  Compile & run:  `cargo run --bin beta_alpha_scan`
 
-use crate::graph::{Graph, StepInfo};
+use scan::graph::{Graph, StepInfo};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
@@ -16,7 +16,7 @@ use std::sync::Mutex;
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Config {
     n_nodes:      usize,
     n_steps:      usize,

@@ -1,4 +1,4 @@
-use crate::graph::Graph;
+use scan::graph::Graph;
 
 #[test]
 fn test_entropy_scaling_law() {
@@ -8,7 +8,7 @@ fn test_entropy_scaling_law() {
 
     // Rescale
     let lambda = 2.5_f64;
-    g.rescale_weights(lambda);
+    g.rescale(lambda);
     let s1 = g.entropy_action();
 
     let expected = lambda * s0 + lambda * w0 * lambda.ln();

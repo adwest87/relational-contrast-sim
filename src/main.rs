@@ -1,7 +1,7 @@
 //! Parameter scan for the relational‑connection model
 //! (see `Config` below for all run parameters).
 
-use crate::graph::{Graph, StepInfo};          // `StepInfo` is new, see comment below.
+use scan::graph::{Graph, StepInfo};          // `StepInfo` is new, see comment below.
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
