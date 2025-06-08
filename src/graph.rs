@@ -108,6 +108,16 @@ impl Graph {
         Self::complete_random_with(&mut rng, n)
     }
 
+    /// number of (unordered) triangles
+    pub fn n_tri(&self) -> usize {
+        self.n() * (self.n() - 1) * (self.n() - 2) / 6
+    }
+
+    ///  ΣΔ divided by number of triangles
+    pub fn triangle_sum_norm(&self) -> f64 {
+        self.triangle_sum() / self.n_tri() as f64
+    }
+    
     // ---------------------------------------------------------------------
     // Cheap accessors
     // ---------------------------------------------------------------------

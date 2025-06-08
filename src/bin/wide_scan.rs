@@ -37,10 +37,12 @@ impl Default for WideConfig {
             n_steps:      60_000,
             equil_steps:  10_000,
             sample_every: 10,
-            beta_vals:    (0..=12)           // 0.00 … 3.00, step 0.25
+            //beta_vals:  vec![0.25, 2.0],   // only two betas
+            //alpha_vals: vec![0.0, 1.0],        // one alpha
+            beta_vals:    (1..=12)           // 0.00 … 3.00, step 0.25
                               .map(|i| 0.25 * i as f64)
                               .collect(),
-            alpha_vals:   (0..=12)           // 0.0 … 6.0, step 0.5
+            alpha_vals:   (1..=12)           // 0.0 … 6.0, step 0.5
                               .map(|i| 0.50 * i as f64)
                               .collect(),
             n_rep:        2,
@@ -101,8 +103,8 @@ impl Tuner {
 struct Row {
     beta:      f64,
     alpha:     f64,
-    mean_w:    f64,
-    std_w:     f64,
+    //mean_w:    f64,
+    //std_w:     f64,
     mean_cos:  f64,
     std_cos:   f64,
     chi:       f64,
@@ -135,7 +137,7 @@ fn main() {
         let mut master = ChaCha20Rng::from_entropy();               // separate master per β
 
         for (a_idx, &alpha) in cfg.alpha_vals.iter().enumerate() {
-            let mut stats_w   = OnlineStats::default();
+            //let mut stats_w   = OnlineStats::default();
             let mut stats_cos = OnlineStats::default();
             let mut stats_se   = OnlineStats::default();   // entropy
             let mut stats_tri  = OnlineStats::default();   // triangle sum
@@ -176,21 +178,18 @@ fn main() {
                         let avg_w   = sum_w   / g.m() as f64;
                         let avg_cos = sum_cos / g.m() as f64;
                         let s_entropy = g.entropy_action();
-                        let tri_sum   = g.triangle_sum();
+                        let tri_sum   = g.triangle_sum_norm();
                         let s_total   = beta * s_entropy + alpha * tri_sum;
                         stats_se  .push(s_entropy);
                         stats_tri .push(tri_sum);
                         stats_stot.push(s_total);
-                        stats_w.push(avg_w);
+                        //stats_w.push(avg_w);
                         stats_cos.push(avg_cos);
                     }
                 } // end step loop
             }     // end replica loop
 
             let chi = links_per as f64 * stats_cos.var();
-            let mut stats_stot = OnlineStats::default();   // total action
-            let mut stats_se   = OnlineStats::default();   // entropy
-            let mut stats_tri  = OnlineStats::default();   // triangle sum
             let c_spec   = stats_stot.var()  / links_per as f64;   // C = Var(S_tot)/m
             let s_bar    = stats_se  .mean() / links_per as f64;   // S̄  = ⟨S_e⟩/m
             let delta_bar= stats_tri .mean() / n_tri     as f64;   // Δ̄  = ⟨ΣΔ⟩/n_tri
@@ -199,8 +198,8 @@ fn main() {
             rows.lock().unwrap().push(Row {
                 beta,
                 alpha,
-                mean_w:   stats_w.mean(),
-                std_w:    stats_w.std(),
+                //mean_w:   stats_w.mean(),
+                //std_w:    stats_w.std(),
                 mean_cos: stats_cos.mean(),
                 std_cos:  stats_cos.std(),
                 chi,
