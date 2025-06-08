@@ -33,15 +33,15 @@ struct WideConfig {
 impl Default for WideConfig {
     fn default() -> Self {
         Self {
-            n_nodes:      24,
-            n_steps:      40_000,
-            equil_steps:  8_000,
+            n_nodes:      128,
+            n_steps:      60_000,
+            equil_steps:  10_000,
             sample_every: 10,
-            beta_vals:    (16..=44)           // 0.8 … 2.2, step 0.05
-                              .map(|i| 0.05 * i as f64)
+            beta_vals:    (0..=12)           // 0.00 … 3.00, step 0.25
+                              .map(|i| 0.25 * i as f64)
                               .collect(),
-            alpha_vals:   (0..=30)
-                              .map(|i| 0.10 * i as f64)
+            alpha_vals:   (0..=12)           // 0.0 … 6.0, step 0.5
+                              .map(|i| 0.50 * i as f64)
                               .collect(),
             n_rep:        2,
             tune_win:     200,
@@ -106,6 +106,9 @@ struct Row {
     mean_cos:  f64,
     std_cos:   f64,
     chi:       f64,
+    c_spec:    f64,
+    s_bar:     f64,
+    delta_bar: f64,
 }
 
 // -----------------------------------------------------------------------------
@@ -116,6 +119,8 @@ fn main() {
     println!("Running scan with configuration:\n{cfg:#?}");
 
     let links_per = cfg.n_nodes * (cfg.n_nodes - 1) / 2;
+    let n_tri = cfg.n_nodes * (cfg.n_nodes - 1) * (cfg.n_nodes - 2) / 6;
+
 
     // Progress bar counts (β, α) pairs.
     let bar = ProgressBar::new((cfg.beta_vals.len() * cfg.alpha_vals.len()) as u64);
@@ -132,6 +137,9 @@ fn main() {
         for (a_idx, &alpha) in cfg.alpha_vals.iter().enumerate() {
             let mut stats_w   = OnlineStats::default();
             let mut stats_cos = OnlineStats::default();
+            let mut stats_se   = OnlineStats::default();   // entropy
+            let mut stats_tri  = OnlineStats::default();   // triangle sum
+            let mut stats_stot = OnlineStats::default();   // total action
 
             for rep in 0..cfg.n_rep {
                 // Unique deterministic seed from indices.
@@ -167,6 +175,12 @@ fn main() {
                     if step > cfg.equil_steps && step % cfg.sample_every == 0 {
                         let avg_w   = sum_w   / g.m() as f64;
                         let avg_cos = sum_cos / g.m() as f64;
+                        let s_entropy = g.entropy_action();
+                        let tri_sum   = g.triangle_sum();
+                        let s_total   = beta * s_entropy + alpha * tri_sum;
+                        stats_se  .push(s_entropy);
+                        stats_tri .push(tri_sum);
+                        stats_stot.push(s_total);
                         stats_w.push(avg_w);
                         stats_cos.push(avg_cos);
                     }
@@ -174,6 +188,13 @@ fn main() {
             }     // end replica loop
 
             let chi = links_per as f64 * stats_cos.var();
+            let mut stats_stot = OnlineStats::default();   // total action
+            let mut stats_se   = OnlineStats::default();   // entropy
+            let mut stats_tri  = OnlineStats::default();   // triangle sum
+            let c_spec   = stats_stot.var()  / links_per as f64;   // C = Var(S_tot)/m
+            let s_bar    = stats_se  .mean() / links_per as f64;   // S̄  = ⟨S_e⟩/m
+            let delta_bar= stats_tri .mean() / n_tri     as f64;   // Δ̄  = ⟨ΣΔ⟩/n_tri
+
 
             rows.lock().unwrap().push(Row {
                 beta,
@@ -183,6 +204,9 @@ fn main() {
                 mean_cos: stats_cos.mean(),
                 std_cos:  stats_cos.std(),
                 chi,
+                c_spec,
+                s_bar,
+                delta_bar,
             });
 
             bar.inc(1);
@@ -199,13 +223,13 @@ fn main() {
     // Write CSV
     // ---------------------------------------------------------------------
     let mut wtr = WriterBuilder::new()
-        .from_path("scan_wide.csv")   // new name
+        .from_path("scan_coarse.csv")   // new name
         .expect("cannot create scan_wide.csv");
 
     wtr.write_record(&[
     "beta","alpha",
     //"mean_w","std_w",
-    "mean_cos","std_cos","susceptibility"
+    "mean_cos","std_cos","susceptibility","C","S_bar","Delta_bar"
     ]).unwrap();
 
     for r in &rows {
@@ -217,9 +241,12 @@ fn main() {
             r.mean_cos.to_string(),
             r.std_cos.to_string(),
             r.chi.to_string(),
+            r.c_spec.to_string(),
+            r.s_bar.to_string(),
+            r.delta_bar.to_string(),
         ]).unwrap();
     }
     wtr.flush().unwrap();
 
-    println!("Scan complete → scan_wide.csv");
+    println!("Scan complete → scan_coarse.csv");
 }

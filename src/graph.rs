@@ -162,20 +162,26 @@ impl Graph {
     // Action and geometry
     // ---------------------------------------------------------------------
 
-    /// Total action for a given α.
-    pub fn action(&self, alpha: f64) -> f64 {
-        self.invariant_action() + self.triangle_action(alpha)
+    /// S = β Σ w ln w  +  α Σ triangle
+    pub fn action(&self, alpha: f64, beta: f64) -> f64 {
+        beta * self.entropy_action()          // β Σ w ln w
+      + alpha * self.triangle_sum()           // α Σ triangle
     }
 
-    /// Triangle term with coefficient α.
-    pub fn triangle_action(&self, alpha: f64) -> f64 {
-        let sum: f64 = self.triangles.iter().map(|&(i, j, k)| {
+
+    /// ∑_{triangles} 3 cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
+    pub fn triangle_sum(&self) -> f64 {
+        self.triangles.iter().map(|&(i, j, k)| {
             let t_ij = self.links[self.link_index(i, j)].theta;
             let t_jk = self.links[self.link_index(j, k)].theta;
             let t_ki = self.links[self.link_index(k, i)].theta;
             3.0 * (t_ij + t_jk + t_ki).cos()
-        }).sum();
-        alpha * sum
+        }).sum()
+    }
+
+    /// S_Δ(α) = α × triangle_sum
+    pub fn triangle_action(&self, alpha: f64) -> f64 {
+        alpha * self.triangle_sum()
     }
 
     /// Index in `self.links` for the unordered pair (i, j).
@@ -228,16 +234,14 @@ impl Graph {
         delta_theta: f64,
         rng: &mut impl Rng,      // `Rng` so `.gen()` is available
     ) -> StepInfo {
-        let s_before = self.action(alpha);
-
+        let s_before = self.action(alpha, beta);
         let proposal = self.propose_update(delta_w, delta_theta, rng);
-        let s_after  = self.action(alpha);
+        let s_after  = self.action(alpha, beta);
         let delta_s  = s_after - s_before;
-
         let accept = if delta_s <= 0.0 {
             true
         } else {
-            rng.gen::<f64>() < (-beta * delta_s).exp()
+            rng.gen::<f64>() < (-delta_s).exp()
         };
 
         if accept {

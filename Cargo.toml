@@ -12,3 +12,6 @@ indicatif    = { version = "0.17" }
 nalgebra     = { version = "0.32" }
 clap = { version = "4.5.39", features = ["derive"] }
 
+[[bin]]
+name = "wide_scan"
+path = "src/bin/wide_scan.rs"

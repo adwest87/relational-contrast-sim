@@ -46,13 +46,13 @@ fn main() {
     // -------------------------------------------------------------------
     // Configuration
     // -------------------------------------------------------------------
-    let n_nodes          = 8;
-    let n_steps: usize   = 100_000;
+    let n_nodes          = 48;
+    let n_steps: usize   = 120_000;
     let equil_steps      = 20_000;
     let report_every     = 1_000;
 
-    let beta   = 1.0;
-    let alpha  = 1.0;
+    let beta   = 2.0;
+    let alpha  = 0.05;
 
     let mut tuner_w  = Tuner::new(0.10, 200, 0.30, 0.05);
     let mut tuner_th = Tuner::new(0.20, 200, 0.30, 0.05);
@@ -96,9 +96,15 @@ fn main() {
     // Main loop
     // -------------------------------------------------------------------
     let mut accepted_total = 0usize;
+    let mut sum_ent  = 0.0;    // Σ S_entropy
+    let mut sum_ent2 = 0.0;    // Σ S_entropy²  (for the error bar)
+    let mut sum_tri  = 0.0;    // Σ (triangle sum  without α)
+    let mut sum_tot  = 0.0;    // Σ S_total
+    let mut n_meas   = 0usize; // how many measurements have been accumulated
+
 
     println!(
-        "# step  acc%   δw     δθ     ⟨w⟩     ⟨cosθ⟩   Sₑ        SΔ        A"
+        "# step  acc%   δw     δθ     ⟨w⟩     ⟨cosθ⟩   Sₑ      ΣΔ/α       SΔ       S_tot"
     );
 
     for step in 1..=n_steps {
@@ -115,19 +121,42 @@ fn main() {
         tuner_th.update(accepted);
 
         if step >= equil_steps {
-            recorder.push(&g.links);
+            // instantaneous observables
+            let s_entropy  = g.entropy_action();
+            let tri_sum    = g.triangle_sum();          // ΣΔ (no α yet)
+            let s_total    = beta * s_entropy + alpha * tri_sum;
+
+            // accumulate
+            sum_ent  += s_entropy;
+            sum_ent2 += s_entropy * s_entropy;
+            sum_tri  += tri_sum;
+            sum_tot  += s_total;
+            n_meas  += 1;
         }
 
         if step % report_every == 0 {
             let avg_w   = sum_w   / g.m() as f64;
             let avg_cos = sum_cos / g.m() as f64;
             let s_entropy = g.entropy_action();
-            let s_tri     = g.triangle_action(alpha);
-            let total_a   = g.action(alpha);
+            let s_tri_sum = g.triangle_sum();          //   Σtriangle  (no α yet)
+            let s_tri     = alpha * s_tri_sum;         //   full contribution
+            let s_tri_per = s_tri_sum;                 //   == S_triangle / α
+            let total_a   = g.action(alpha, beta);
             let acc_rate  = accepted_total as f64 / step as f64;
+            let mean_ent  = sum_ent  / n_meas as f64;
+            let mean_tri  = sum_tri  / n_meas as f64;
+            let mean_tot  = sum_tot  / n_meas as f64;
+
+            let err_ent   = ((sum_ent2 / n_meas as f64) - mean_ent.powi(2)).sqrt() / (n_meas as f64).sqrt();
+
+            println!("# β = {beta:.2}, α = {alpha:.2}, n = {n_nodes}");
+            println!("⟨S_entropy⟩   = {mean_ent:9.3}  ± {err_ent:.3}");
+            println!("⟨ΣΔ/α⟩         = {mean_tri:9.3}  (no α factor)");
+            println!("⟨S_total⟩     = {mean_tot:9.3}");
+
 
             println!(
-                "{:>6} {:>5.2}% {:>6.3} {:>6.3} {:>7.3} {:>8.3} {:>10.2} {:>10.2} {:>10.2}",
+                "{:>6} {:>5.2}% {:>6.3} {:>6.3} {:>7.3} {:>8.3} {:>10.2} {:>10.2} {:>10.2} {:>10.2}",
                 step,
                 100.0 * acc_rate,
                 tuner_w.delta,
@@ -135,6 +164,7 @@ fn main() {
                 avg_w,
                 avg_cos,
                 s_entropy,
+                s_tri_per,
                 s_tri,
                 total_a,
             );
@@ -155,6 +185,20 @@ fn main() {
         bar.inc(1);
     }
     bar.finish();
+
+    if n_meas > 0 {
+    let mean_ent = sum_ent / n_meas as f64;
+    let mean_tri = sum_tri / n_meas as f64;
+    let mean_tot = sum_tot / n_meas as f64;
+    let err_ent  = ((sum_ent2 / n_meas as f64) - mean_ent.powi(2)).sqrt()
+                   / (n_meas as f64).sqrt();
+
+    println!("\n# FINAL AVERAGES  ({} measurements)", n_meas);
+    println!("⟨S_entropy⟩   = {mean_ent:9.3}  ± {err_ent:.3}");
+    println!("⟨ΣΔ/α⟩         = {mean_tri:9.3}");
+    println!("⟨S_total⟩     = {mean_tot:9.3}");
+    }
+
 
     // -------------------------------------------------------------------
     // Save final phases
