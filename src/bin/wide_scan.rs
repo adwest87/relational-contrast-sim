@@ -37,13 +37,13 @@ impl Default for WideConfig {
             n_steps:      60_000,
             equil_steps:  10_000,
             sample_every: 10,
-            //beta_vals:  vec![0.25, 2.0],   // only two betas
-            //alpha_vals: vec![0.0, 1.0],        // one alpha
+            //beta_vals:  vec![0.25, 2.0],   
+            //alpha_vals: vec![0.0, 2000.0],        
             beta_vals:    (1..=12)           // 0.00 … 3.00, step 0.25
                               .map(|i| 0.25 * i as f64)
                               .collect(),
-            alpha_vals:   (1..=12)           // 0.0 … 6.0, step 0.5
-                              .map(|i| 0.50 * i as f64)
+            alpha_vals:   (0..=10)           // 0, 200, 400, …, 2000
+                              .map(|i| 200.0 * i as f64)
                               .collect(),
             n_rep:        2,
             tune_win:     200,
@@ -185,6 +185,16 @@ fn main() {
                         stats_stot.push(s_total);
                         //stats_w.push(avg_w);
                         stats_cos.push(avg_cos);
+                        //let ratio = if tri_sum != 0.0 {
+                        //    (alpha * tri_sum).abs() / (beta * s_entropy).abs()
+                        //} else { 0.0 };
+
+                        //if step > cfg.equil_steps && step % cfg.sample_every == 0 {
+                        //    eprintln!("α={alpha:6.1}  β={beta:4.2}  |αΔ| / |βSₑ| = {ratio:10.2e}");
+                        //}
+
+
+
                     }
                 } // end step loop
             }     // end replica loop
