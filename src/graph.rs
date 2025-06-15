@@ -1,20 +1,17 @@
-//! Minimal graph data structure for the Relational‑Contrast model
-//! • Node  : identified by an integer id
-//! • Link  : unordered pair (i, j) with weight w and U(1) phase θ
-//! • Graph : complete, undirected, with pre‑computed triangle list
-//! ------------------------------------------------------------------
+// src/graph.rs - Enhanced implementation with missing features
 
 use crate::projector::{aib_project, frobenius_norm};
 use rand::distributions::{Distribution, Uniform};
-use rand::Rng;          // `Rng` brings `.gen()` into scope
+use rand::Rng;
+use std::collections::HashMap;
 
-/// A vertex in the network.
+/// A vertex in the network
 #[derive(Debug, Clone)]
 pub struct Node {
     pub id: usize,
 }
 
-/// An undirected edge with a weight and a U(1) phase.
+/// An undirected edge with weight, U(1) phase, and contrast tensor
 #[derive(Debug, Clone)]
 pub struct Link {
     pub i: usize,
@@ -24,67 +21,51 @@ pub struct Link {
     pub tensor: [[[f64; 3]; 3]; 3],
 }
 
-/// A simple undirected complete graph.
+/// Information returned by metropolis_step for O(1) bookkeeping
+#[derive(Debug, Clone, Copy)]
+pub struct StepInfo {
+    pub accepted: bool,
+    pub delta_w: f64,   // change in Σ w
+    pub delta_cos: f64, // change in Σ cos θ
+}
+
+/// Complete undirected graph with contrast structure
 #[derive(Debug)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
     pub dt: f64,
     triangles: Vec<(usize, usize, usize)>,
-}
-
-/// Helper: generate a random third‑rank tensor with entries in (‑1, 1).
-fn random_tensor(rng: &mut impl Rng) -> [[[f64; 3]; 3]; 3] {
-    let mut t = [[[0.0; 3]; 3]; 3];
-    for a in 0..3 {
-        for b in 0..3 {
-            for c in 0..3 {
-                t[a][b][c] = rng.gen_range(-1.0..1.0);
-            }
-        }
-    }
-    t
-}
-
-/// A proposed update during Metropolis.
-#[derive(Debug)]
-enum Proposal {
-    Weight { idx: usize, old_w: f64, new_w: f64 },
-    Phase  { idx: usize, old_th: f64, new_th: f64 },
-}
-
-/// Returned by `metropolis_step`, allows O(1) book‑keeping in the driver.
-#[derive(Debug, Clone, Copy)]
-pub struct StepInfo {
-    pub accepted: bool,
-    pub delta_w:  f64,   // change in Σ w
-    pub delta_cos: f64,  // change in Σ cos θ
+    // New: adjacency structure for efficient queries
+    adjacency: HashMap<(usize, usize), usize>, // (i,j) -> link index
 }
 
 impl Graph {
-    // ---------------------------------------------------------------------
-    // Constructors
-    // ---------------------------------------------------------------------
-
-    /// Build a complete graph on `n` nodes with random weights and phases,
-    /// using a caller‑supplied RNG (preferred for reproducibility).
+    /// Build a complete graph with random weights and phases
     pub fn complete_random_with(rng: &mut impl Rng, n: usize) -> Self {
         let nodes = (0..n).map(|id| Node { id }).collect::<Vec<_>>();
-
+        
         let mut links = Vec::with_capacity(n * (n - 1) / 2);
+        let mut adjacency = HashMap::new();
+        
+        let mut link_idx = 0;
         for i in 0..n {
             for j in (i + 1)..n {
+                adjacency.insert((i, j), link_idx);
+                adjacency.insert((j, i), link_idx);
+                
                 links.push(Link {
                     i,
                     j,
                     w: rng.gen_range(0.000_001..=1.0),
-                    theta: 0.0,                       // unit holonomy by default
+                    theta: 0.0,
                     tensor: random_tensor(rng),
                 });
+                link_idx += 1;
             }
         }
 
-        // Pre‑compute all unordered triangles (i < j < k).
+        // Pre-compute all triangles
         let mut triangles = Vec::new();
         for i in 0..n {
             for j in (i + 1)..n {
@@ -99,68 +80,43 @@ impl Graph {
             links,
             dt: 1.0,
             triangles,
+            adjacency,
         }
     }
 
-    /// Convenience wrapper that uses `thread_rng`.
     pub fn complete_random(n: usize) -> Self {
         let mut rng = rand::thread_rng();
         Self::complete_random_with(&mut rng, n)
     }
 
-    /// number of (unordered) triangles
-    pub fn n_tri(&self) -> usize {
-        self.n() * (self.n() - 1) * (self.n() - 2) / 6
-    }
-
-    ///  ΣΔ divided by number of triangles
-    pub fn triangle_sum_norm(&self) -> f64 {
-        self.triangle_sum() / self.n_tri() as f64
-    }
+    // Graph properties
+    #[inline(always)]
+    pub fn n(&self) -> usize { self.nodes.len() }
     
-    // ---------------------------------------------------------------------
-    // Cheap accessors
-    // ---------------------------------------------------------------------
-
-    /// Number of vertices.
     #[inline(always)]
-    pub fn n(&self) -> usize {
-        self.nodes.len()
-    }
+    pub fn m(&self) -> usize { self.links.len() }
+    
+    pub fn n_tri(&self) -> usize { self.triangles.len() }
 
-    /// Number of edges.
-    #[inline(always)]
-    pub fn m(&self) -> usize {
-        self.links.len()
-    }
-
-    /// Σ w over all links.
+    // Observable calculations
     pub fn sum_weights(&self) -> f64 {
         self.links.iter().map(|l| l.w).sum()
     }
 
-    /// Σ cos θ over all links.
     pub fn links_cos_sum(&self) -> f64 {
         self.links.iter().map(|l| l.theta.cos()).sum()
     }
 
-    // ---------------------------------------------------------------------
-    // Dougal‑invariant observables
-    // ---------------------------------------------------------------------
-
-    /// Entropy term `S = Σ w ln w`.
     pub fn entropy_action(&self) -> f64 {
         self.links.iter().map(|l| l.w * l.w.ln()).sum()
     }
 
-    /// Invariant combination `I = (S - ln(dt) Σ w) / dt`.
     pub fn invariant_action(&self) -> f64 {
         let s = self.entropy_action();
         let sum_w = self.sum_weights();
         (s - self.dt.ln() * sum_w) / self.dt
     }
 
-    /// Rescale all link weights and `dt` by λ (Dougal transformation).
     pub fn rescale(&mut self, lambda: f64) {
         for link in &mut self.links {
             link.w *= lambda;
@@ -168,18 +124,7 @@ impl Graph {
         self.dt *= lambda;
     }
 
-    // ---------------------------------------------------------------------
-    // Action and geometry
-    // ---------------------------------------------------------------------
-
-    /// S = β Σ w ln w  +  α Σ triangle
-    pub fn action(&self, alpha: f64, beta: f64) -> f64 {
-        beta * self.entropy_action()          // β Σ w ln w
-      + alpha * self.triangle_sum()           // α Σ triangle
-    }
-
-
-    /// ∑_{triangles} 3 cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
+    // Triangle sum for gauge action
     pub fn triangle_sum(&self) -> f64 {
         self.triangles.iter().map(|&(i, j, k)| {
             let t_ij = self.links[self.link_index(i, j)].theta;
@@ -189,24 +134,71 @@ impl Graph {
         }).sum()
     }
 
-    /// S_Δ(α) = α × triangle_sum
     pub fn triangle_action(&self, alpha: f64) -> f64 {
         alpha * self.triangle_sum()
     }
 
-    /// Index in `self.links` for the unordered pair (i, j).
-    /// Works only for a complete graph.
-    fn link_index(&self, i: usize, j: usize) -> usize {
-        let n = self.n();
-        let (i, j) = if i < j { (i, j) } else { (j, i) };
-        i * (n - 1) - i * (i + 1) / 2 + (j - i - 1)
+    pub fn triangle_sum_norm(&self) -> f64 {
+        self.triangle_sum() / self.n_tri() as f64
     }
 
-    // ---------------------------------------------------------------------
-    // Metropolis machinery
-    // ---------------------------------------------------------------------
+    pub fn action(&self, alpha: f64, beta: f64) -> f64 {
+        beta * self.entropy_action() + alpha * self.triangle_sum()
+    }
 
-    /// Create either a weight or phase perturbation.
+    // Fast link lookup using adjacency map
+    pub fn link_index(&self, i: usize, j: usize) -> usize {
+        *self.adjacency.get(&(i.min(j), i.max(j))).unwrap()
+    }
+
+    // Metropolis implementation
+    pub fn metropolis_step(
+        &mut self,
+        beta: f64,
+        alpha: f64,
+        delta_w: f64,
+        delta_theta: f64,
+        rng: &mut impl Rng,
+    ) -> StepInfo {
+        let s_before = self.action(alpha, beta);
+        let proposal = self.propose_update(delta_w, delta_theta, rng);
+        let s_after = self.action(alpha, beta);
+        let delta_s = s_after - s_before;
+        
+        let accept = if delta_s <= 0.0 {
+            true
+        } else {
+            rng.gen::<f64>() < (-delta_s).exp()
+        };
+
+        match proposal {
+            Proposal::Weight { idx, old_w, new_w } => {
+                if accept {
+                    StepInfo {
+                        accepted: true,
+                        delta_w: new_w - old_w,
+                        delta_cos: 0.0,
+                    }
+                } else {
+                    self.links[idx].w = old_w;
+                    StepInfo { accepted: false, delta_w: 0.0, delta_cos: 0.0 }
+                }
+            }
+            Proposal::Phase { idx, old_th, new_th } => {
+                if accept {
+                    StepInfo {
+                        accepted: true,
+                        delta_w: 0.0,
+                        delta_cos: new_th.cos() - old_th.cos(),
+                    }
+                } else {
+                    self.links[idx].theta = old_th;
+                    StepInfo { accepted: false, delta_w: 0.0, delta_cos: 0.0 }
+                }
+            }
+        }
+    }
+
     fn propose_update(
         &mut self,
         delta_w: f64,
@@ -214,7 +206,7 @@ impl Graph {
         rng: &mut impl Rng,
     ) -> Proposal {
         let link_index = rng.gen_range(0..self.links.len());
-
+        
         let phase_only = delta_w == 0.0;
         let do_weight = !phase_only && rng.gen_bool(0.5);
 
@@ -233,74 +225,58 @@ impl Graph {
         }
     }
 
-    /// Perform one Metropolis step.  The caller supplies the RNG to keep
-    /// random streams reproducible.  `StepInfo` tells the driver how Σ w
-    /// and Σ cos θ changed, enabling O(1) updates.
-    pub fn metropolis_step(
-        &mut self,
-        beta: f64,
-        alpha: f64,
-        delta_w: f64,
-        delta_theta: f64,
-        rng: &mut impl Rng,      // `Rng` so `.gen()` is available
-    ) -> StepInfo {
-        let s_before = self.action(alpha, beta);
-        let proposal = self.propose_update(delta_w, delta_theta, rng);
-        let s_after  = self.action(alpha, beta);
-        let delta_s  = s_after - s_before;
-        let accept = if delta_s <= 0.0 {
-            true
-        } else {
-            rng.gen::<f64>() < (-delta_s).exp()
-        };
-
-        if accept {
-            match proposal {
-                Proposal::Weight { old_w, new_w, .. } => StepInfo {
-                    accepted: true,
-                    delta_w:  new_w - old_w,
-                    delta_cos: 0.0,
-                },
-                Proposal::Phase { old_th, new_th, .. } => StepInfo {
-                    accepted: true,
-                    delta_w:  0.0,
-                    delta_cos: new_th.cos() - old_th.cos(),
-                },
-            }
-        } else {
-            // Revert.
-            match proposal {
-                Proposal::Weight { idx, old_w, .. } => self.links[idx].w = old_w,
-                Proposal::Phase  { idx, old_th, .. } => self.links[idx].theta = old_th,
-            }
-            StepInfo { accepted: false, delta_w: 0.0, delta_cos: 0.0 }
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // Tensor projection (unchanged)
-    // ---------------------------------------------------------------------
-
-    /// Project every link tensor with the AIB projector.
-    /// Returns the Frobenius norm before and after projection.
+    // Tensor projection
     pub fn project_all(&mut self) -> (f64, f64) {
         let mut norm_before = 0.0;
-        let mut norm_after  = 0.0;
+        let mut norm_after = 0.0;
 
         for link in &mut self.links {
             norm_before += frobenius_norm(&link.tensor);
-            link.tensor  = aib_project(link.tensor);
-            norm_after  += frobenius_norm(&link.tensor);
+            link.tensor = aib_project(link.tensor);
+            norm_after += frobenius_norm(&link.tensor);
         }
         (norm_before, norm_after)
     }
 
-    // ---------------------------------------------------------------------
-    // Utility iterations
-    // ---------------------------------------------------------------------
+    // New: Spectral analysis methods
+    pub fn laplacian_matrix(&self) -> Vec<Vec<f64>> {
+        let n = self.n();
+        let mut lap = vec![vec![0.0; n]; n];
+        
+        for link in &self.links {
+            lap[link.i][link.j] -= link.w;
+            lap[link.j][link.i] -= link.w;
+            lap[link.i][link.i] += link.w;
+            lap[link.j][link.j] += link.w;
+        }
+        lap
+    }
 
-    /// Iterate over all unordered triangles (i < j < k).
+    // New: Find minimal weight
+    pub fn min_weight(&self) -> f64 {
+        self.links.iter().map(|l| l.w).fold(f64::INFINITY, f64::min)
+    }
+
+    // Iterator over triangles
     pub fn triangles(&self) -> impl Iterator<Item = (usize, usize, usize)> + '_ {
         self.triangles.iter().copied()
     }
+}
+
+#[derive(Debug)]
+enum Proposal {
+    Weight { idx: usize, old_w: f64, new_w: f64 },
+    Phase { idx: usize, old_th: f64, new_th: f64 },
+}
+
+fn random_tensor(rng: &mut impl Rng) -> [[[f64; 3]; 3]; 3] {
+    let mut t = [[[0.0; 3]; 3]; 3];
+    for a in 0..3 {
+        for b in 0..3 {
+            for c in 0..3 {
+                t[a][b][c] = rng.gen_range(-1.0..1.0);
+            }
+        }
+    }
+    t
 }

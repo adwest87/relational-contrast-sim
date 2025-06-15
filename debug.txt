@@ -1,0 +1,12 @@
+   Compiling scan v0.2.0 (/Users/adamwest/relational-contrast-sim)
+warning: unused variable: `avg_w`
+   --> src/bin/wide_scan.rs:181:29
+    |
+181 |                         let avg_w   = sum_w   / g.m() as f64;
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_avg_w`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: `scan` (bin "wide_scan") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 1.23s
+     Running `target/release/wide_scan`
