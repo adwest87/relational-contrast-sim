@@ -34,9 +34,9 @@ impl Default for WideConfig {
     fn default() -> Self {
         Self {
             n_nodes:      128,
-            n_steps:      60_000,
+            n_steps:      50_000,
             equil_steps:  10_000,
-            sample_every: 10,
+            sample_every: 20,
             //beta_vals:  vec![0.25, 2.0],   
             //alpha_vals: vec![0.0, 2000.0],        
             beta_vals:    (1..=12)           // 0.00 … 3.00, step 0.25

@@ -108,7 +108,11 @@ impl Graph {
     }
 
     pub fn entropy_action(&self) -> f64 {
-        self.links.iter().map(|l| l.w * l.w.ln()).sum()
+        self.links.iter().map(|l| {
+            // Clamp weights to avoid numerical issues
+            let w_safe = l.w.max(1e-10).min(1.0 - 1e-10);
+            w_safe * w_safe.ln()
+        }).sum()
     }
 
     pub fn invariant_action(&self) -> f64 {
