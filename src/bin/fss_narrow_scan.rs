@@ -1,4 +1,4 @@
-// improved_narrow_scan.rs - Fixed version with z-variables and better analysis
+// src/bin/fss_narrow_scan.rs - Narrow scan with configurable system size
 
 use std::{fs::File, io::BufReader, path::PathBuf};
 
@@ -10,8 +10,31 @@ use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use scan::graph::{Graph, StepInfo};
 
-/// Configuration for MC simulation
-#[derive(Clone, Debug)]
+#[derive(Parser)]
+struct Cli {
+    #[arg(long, default_value = "pairs.csv")]
+    pairs: PathBuf,
+    
+    #[arg(long, default_value = "fss_results.csv")]
+    output: PathBuf,
+    
+    /// Number of nodes (system size)
+    #[arg(long, short, default_value = "48")]
+    nodes: usize,
+    
+    /// Number of MC steps (scaled automatically if not specified)
+    #[arg(long)]
+    steps: Option<usize>,
+    
+    /// Number of replicas
+    #[arg(long, short, default_value = "5")]
+    replicas: usize,
+    
+    #[arg(long)]
+    debug: bool,
+}
+
+/// Configuration that scales with system size
 struct MCConfig {
     n_nodes:      usize,
     n_steps:      usize,
@@ -23,31 +46,24 @@ struct MCConfig {
     tune_band:    f64,
 }
 
-impl Default for MCConfig {
-    fn default() -> Self {
+impl MCConfig {
+    fn new(n_nodes: usize, n_steps: Option<usize>, n_rep: usize) -> Self {
+        // Scale steps with sqrt(48/N) to maintain statistics
+        let scale = (48.0 / n_nodes as f64).sqrt();
+        let base_steps = 200_000;
+        let base_equil = 80_000;
+        
         Self {
-            n_nodes:      48,
-            n_steps:      200_000,
-            equil_steps:  80_000,
+            n_nodes,
+            n_steps: n_steps.unwrap_or((base_steps as f64 * scale) as usize),
+            equil_steps: (base_equil as f64 * scale) as usize,
             sample_every: 10,
-            n_rep:        5,
-            tune_win:     200,
-            tune_tgt:     0.30,
-            tune_band:    0.05,
+            n_rep,
+            tune_win: 200,
+            tune_tgt: 0.30,
+            tune_band: 0.05,
         }
     }
-}
-
-#[derive(Parser)]
-struct Cli {
-    #[arg(long, default_value = "pairs.csv")]
-    pairs: PathBuf,
-    
-    #[arg(long, default_value = "improved_narrow_results.csv")]
-    output: PathBuf,
-    
-    #[arg(long)]
-    debug: bool,
 }
 
 #[derive(Debug)]
@@ -61,16 +77,17 @@ struct ResultRow {
     chi:            f64,
     mean_action:    f64,
     std_action:     f64,
+    binder:         f64,  // Binder cumulant
     autocorr_time:  f64,
     acceptance:     f64,
 }
 
-/// Online statistics accumulator
 #[derive(Default, Clone)]
 struct OnlineStats {
     n: u64,
     mean: f64,
     m2: f64,
+    m4_sum: f64,  // For 4th moment
 }
 
 impl OnlineStats {
@@ -80,14 +97,21 @@ impl OnlineStats {
         self.mean += delta / self.n as f64;
         let delta2 = x - self.mean;
         self.m2   += delta * delta2;
+        self.m4_sum += x.powi(4);
     }
     
     fn mean(&self) -> f64 { self.mean }
     fn var(&self)  -> f64 { if self.n > 1 { self.m2 / (self.n - 1) as f64 } else { 0.0 } }
     fn std(&self)  -> f64 { self.var().sqrt() }
+    fn moment4(&self) -> f64 { if self.n > 0 { self.m4_sum / self.n as f64 } else { 0.0 } }
+    
+    fn binder_cumulant(&self) -> f64 {
+        let m2 = self.var() + self.mean().powi(2);
+        let m4 = self.moment4();
+        if m2 > 0.0 { 1.0 - m4 / (3.0 * m2 * m2) } else { 0.0 }
+    }
 }
 
-/// Adaptive tuner for z-variable updates
 struct Tuner {
     delta: f64,
     attempts: usize,
@@ -102,14 +126,8 @@ struct Tuner {
 impl Tuner {
     fn new(delta: f64, win: usize, tgt: f64, band: f64) -> Self {
         Self { 
-            delta, 
-            attempts: 0, 
-            accepted: 0, 
-            win, 
-            tgt, 
-            band,
-            total_attempts: 0,
-            total_accepted: 0,
+            delta, attempts: 0, accepted: 0, win, tgt, band,
+            total_attempts: 0, total_accepted: 0,
         }
     }
     
@@ -139,19 +157,13 @@ impl Tuner {
     }
 }
 
-/// Time series for autocorrelation calculation
 struct TimeSeries {
     data: Vec<f64>,
 }
 
 impl TimeSeries {
-    fn new() -> Self {
-        Self { data: Vec::new() }
-    }
-    
-    fn push(&mut self, x: f64) {
-        self.data.push(x);
-    }
+    fn new() -> Self { Self { data: Vec::new() } }
+    fn push(&mut self, x: f64) { self.data.push(x); }
     
     fn autocorrelation_time(&self) -> f64 {
         if self.data.len() < 100 { return 1.0; }
@@ -179,7 +191,6 @@ impl TimeSeries {
     }
 }
 
-/// Run single (β, α) point
 fn run_single(beta: f64, alpha: f64, mc: &MCConfig, seed_modifier: u64, debug: bool) -> ResultRow {
     let links_per = mc.n_nodes * (mc.n_nodes - 1) / 2;
     
@@ -195,7 +206,6 @@ fn run_single(beta: f64, alpha: f64, mc: &MCConfig, seed_modifier: u64, debug: b
         let mut rng = ChaCha20Rng::seed_from_u64(master.next_u64() ^ rep as u64);
         let mut g = Graph::complete_random_with(&mut rng, mc.n_nodes);
         
-        // Z-variable tuners with appropriate scales
         let mut tuner_z  = Tuner::new(0.50, mc.tune_win, mc.tune_tgt, mc.tune_band);
         let mut tuner_th = Tuner::new(0.20, mc.tune_win, mc.tune_tgt, mc.tune_band);
 
@@ -230,14 +240,15 @@ fn run_single(beta: f64, alpha: f64, mc: &MCConfig, seed_modifier: u64, debug: b
         n_acceptance_samples += 1;
         
         if debug && rep == 0 {
-            eprintln!("β={:.2} α={:.2} rep={}: action={:.1} accept={:.2}", 
-                     beta, alpha, rep, 
+            eprintln!("N={} β={:.2} α={:.2} rep={}: action={:.1} accept={:.2}", 
+                     mc.n_nodes, beta, alpha, rep, 
                      g.action(alpha, beta), 
                      tuner_z.acceptance_rate());
         }
     }
 
     let chi = links_per as f64 * stats_cos.var();
+    let binder = stats_cos.binder_cumulant();
     let autocorr_time = action_series.autocorrelation_time();
     let acceptance = total_acceptance / n_acceptance_samples as f64;
     
@@ -251,6 +262,7 @@ fn run_single(beta: f64, alpha: f64, mc: &MCConfig, seed_modifier: u64, debug: b
         chi,
         mean_action:   stats_action.mean(),
         std_action:    stats_action.std(),
+        binder,
         autocorr_time,
         acceptance,
     }
@@ -258,10 +270,14 @@ fn run_single(beta: f64, alpha: f64, mc: &MCConfig, seed_modifier: u64, debug: b
 
 fn main() {
     let args = Cli::parse();
-    let mc = MCConfig::default();
+    let mc = MCConfig::new(args.nodes, args.steps, args.replicas);
+
+    println!("FSS narrow scan - N={} nodes", mc.n_nodes);
+    println!("Steps: {} (equil: {})", mc.n_steps, mc.equil_steps);
+    println!("Replicas: {}", mc.n_rep);
 
     // Read (β, α) pairs
-    let file = File::open(&args.pairs).expect("cannot open pairs.csv");
+    let file = File::open(&args.pairs).expect("cannot open pairs file");
     let mut rdr = ReaderBuilder::new()
         .has_headers(false)
         .from_reader(BufReader::new(file));
@@ -275,7 +291,7 @@ fn main() {
         })
         .collect();
 
-    println!("Improved narrow scan with z-variables – {} (β,α) points", pairs.len());
+    println!("Running {} (β,α) points", pairs.len());
 
     let bar = ProgressBar::new(pairs.len() as u64);
     bar.set_style(ProgressStyle::with_template(
@@ -287,7 +303,7 @@ fn main() {
         .par_iter()
         .enumerate()
         .map(|(idx, &(β, α))| {
-            let row = run_single(β, α, &mc, idx as u64, args.debug);
+            let row = run_single(β, α, &mc, (idx as u64) << 32 | (args.nodes as u64), args.debug);
             bar.inc(1);
             row
         })
@@ -301,8 +317,8 @@ fn main() {
         .expect("cannot create result file");
 
     wtr.write_record([
-        "beta", "alpha", "mean_w", "std_w", "mean_cos", "std_cos", 
-        "susceptibility", "mean_action", "std_action", "autocorr_time", "acceptance"
+        "n_nodes", "beta", "alpha", "mean_w", "std_w", "mean_cos", "std_cos", 
+        "susceptibility", "mean_action", "std_action", "binder", "autocorr_time", "acceptance"
     ]).unwrap();
 
     let mut rows = rows;
@@ -311,6 +327,7 @@ fn main() {
 
     for r in &rows {
         wtr.write_record([
+            mc.n_nodes.to_string(),
             r.beta.to_string(),
             r.alpha.to_string(),
             r.mean_w.to_string(),
@@ -320,6 +337,7 @@ fn main() {
             r.chi.to_string(),
             r.mean_action.to_string(),
             r.std_action.to_string(),
+            r.binder.to_string(),
             r.autocorr_time.to_string(),
             r.acceptance.to_string(),
         ]).unwrap();
@@ -327,13 +345,4 @@ fn main() {
     
     wtr.flush().unwrap();
     println!("Done → {}", args.output.display());
-    
-    // Summary statistics
-    let mean_action = rows.iter().map(|r| r.mean_action).sum::<f64>() / rows.len() as f64;
-    let max_action = rows.iter().map(|r| r.mean_action).fold(f64::NEG_INFINITY, f64::max);
-    let min_action = rows.iter().map(|r| r.mean_action).fold(f64::INFINITY, f64::min);
-    
-    println!("\nAction statistics:");
-    println!("  Mean: {:.1}", mean_action);
-    println!("  Range: [{:.1}, {:.1}]", min_action, max_action);
 }

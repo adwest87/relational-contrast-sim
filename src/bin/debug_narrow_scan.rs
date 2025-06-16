@@ -320,7 +320,7 @@ fn run_point_debug(
         // Create stats for weights
         let mut stats_w = OnlineStats::new();
         for link in &g.links {
-            stats_w.push(link.w);
+            stats_w.push(link.w());
         }
         
         all_measurements.push((

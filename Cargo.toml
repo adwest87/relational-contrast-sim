@@ -15,3 +15,23 @@ clap = { version = "4.5.39", features = ["derive"] }
 [[bin]]
 name = "wide_scan"
 path = "src/bin/wide_scan.rs"
+
+[[bin]]
+name = "improved_narrow_scan"
+path = "src/bin/improved_narrow_scan.rs"
+
+[[bin]]
+name = "fss_analysis"
+path = "src/bin/fss_analysis.rs"
+
+[[bin]]
+name = "multi_size_scan"
+path = "src/bin/multi_size_scan.rs"
+
+[[bin]]
+name = "generate_pairs"
+path = "src/bin/generate_pairs.rs"
+
+[[bin]]
+name = "fss_narrow_scan"
+path = "src/bin/fss_narrow_scan.rs"

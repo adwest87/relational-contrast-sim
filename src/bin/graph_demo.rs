@@ -11,7 +11,7 @@ fn main() {
     println!("\nDougal scaling check (λ = 2.0)");
     let lambda = 2.0;
     let s_before = g.entropy_action();
-    let sum_w: f64 = g.links.iter().map(|l| l.w).sum();
+    let sum_w: f64 = g.links.iter().map(|l| l.w()).sum();
     g.rescale(lambda);
     let s_after = g.entropy_action();
     let expected  = lambda * s_before + lambda * sum_w * lambda.ln();
