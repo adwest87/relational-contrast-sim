@@ -52,7 +52,7 @@ ax.loglog()
 ax.grid(True, alpha=0.3)
 
 # Fit χ ~ N^(γ/ν)
-if len(sizes) >= 3:
+if len(sizes) >= 2:
     chi_max = []
     for size in sizes:
         df_size = df_all[df_all['n_nodes'] == size]
@@ -61,11 +61,18 @@ if len(sizes) >= 3:
     def power_law(x, a, b):
         return a * x**b
     
-    popt, _ = curve_fit(power_law, sizes, chi_max)
-    x_fit = np.logspace(np.log10(min(sizes)), np.log10(max(sizes)), 50)
-    ax.plot(x_fit, power_law(x_fit, *popt), 'r--', 
-            label=f'γ/ν = {popt[1]:.3f}')
-    ax.legend()
+    try:
+        popt, _ = curve_fit(power_law, sizes, chi_max)
+        x_fit = np.logspace(np.log10(min(sizes)), np.log10(max(sizes)), 50)
+        ax.plot(x_fit, power_law(x_fit, *popt), 'r--', 
+                label=f'γ/ν = {popt[1]:.3f}')
+        ax.legend()
+        gamma_over_nu_fit = popt[1]
+    except:
+        print("Could not fit power law to susceptibility data")
+        gamma_over_nu_fit = None
+else:
+    gamma_over_nu_fit = None
 
 # 2. Binder cumulant crossing
 ax = axes[0, 1]
@@ -151,8 +158,14 @@ Critical point:
 
 System sizes: {sizes}
 
-Preliminary exponents:
-  γ/ν ≈ {popt[1]:.3f} (from χ scaling)
+Preliminary exponents:"""
+
+if gamma_over_nu_fit is not None:
+    summary += f"\n  γ/ν ≈ {gamma_over_nu_fit:.3f} (from χ scaling)"
+else:
+    summary += "\n  γ/ν = (need more data)"
+
+summary += """
   
 Compare to:
   3D Ising: γ/ν = 1.963

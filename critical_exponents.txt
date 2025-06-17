@@ -1,0 +1,15 @@
+FSS Analysis Summary
+─────────────────────
+Critical point:
+  β_c = 2.900
+  α_c = 1.500
+
+System sizes: [np.int64(24), np.int64(48)]
+
+Preliminary exponents:
+  γ/ν ≈ 1.921 (from χ scaling)
+  
+Compare to:
+  3D Ising: γ/ν = 1.963
+  4D Ising: γ/ν = 2.000
+  3D XY:    γ/ν = 1.973
