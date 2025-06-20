@@ -35,3 +35,7 @@ path = "src/bin/generate_pairs.rs"
 [[bin]]
 name = "fss_narrow_scan"
 path = "src/bin/fss_narrow_scan.rs"
+
+[[bin]]
+name = "n96_proper_scan"
+path = "src/bin/n96_proper_scan.rs"

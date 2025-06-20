@@ -1,0 +1,13 @@
+Relational Contrast Model - Phase Transition Analysis
+==================================================
+
+Critical point:
+  β_c = 2.8806
+  α_c = 1.500
+
+Critical exponents:
+  γ/ν = 0.6607 ± 0.4977
+  z = -0.00
+
+Universality class: 3D Ising
+Confidence: 33.7%

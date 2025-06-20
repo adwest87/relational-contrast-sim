@@ -22,9 +22,9 @@ struct Cli {
     #[arg(long, short, default_value = "48")]
     nodes: usize,
     
-    /// Number of MC steps (scaled automatically if not specified)
-    #[arg(long)]
-    steps: Option<usize>,
+    /// Number of MC steps
+    #[arg(long, default_value = "200000")]
+    steps: usize,
     
     /// Number of replicas
     #[arg(long, short, default_value = "5")]
@@ -270,7 +270,7 @@ fn run_single(beta: f64, alpha: f64, mc: &MCConfig, seed_modifier: u64, debug: b
 
 fn main() {
     let args = Cli::parse();
-    let mc = MCConfig::new(args.nodes, args.steps, args.replicas);
+    let mc = MCConfig::new(args.nodes, Some(args.steps), args.replicas);
 
     println!("FSS narrow scan - N={} nodes", mc.n_nodes);
     println!("Steps: {} (equil: {})", mc.n_steps, mc.equil_steps);

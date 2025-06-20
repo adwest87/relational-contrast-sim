@@ -4,10 +4,10 @@ Critical point:
   β_c = 2.900
   α_c = 1.500
 
-System sizes: [np.int64(24), np.int64(48)]
+System sizes: [np.int64(24), np.int64(48), np.int64(96)]
 
 Preliminary exponents:
-  γ/ν ≈ 1.921 (from χ scaling)
+  γ/ν ≈ 0.661 (from χ scaling)
   
 Compare to:
   3D Ising: γ/ν = 1.963
