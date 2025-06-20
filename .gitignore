@@ -6,3 +6,21 @@
 *.png
 *.pdf
 *.ipynb
+
+# LaTeX files and papers
+papers/
+*.tex
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.vrb
+*.bib.bak
+*.run.xml
