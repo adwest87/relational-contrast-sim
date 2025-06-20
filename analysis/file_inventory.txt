@@ -1,0 +1,97 @@
+FILE INVENTORY - Analysis Session 2025-06-20
+===========================================
+
+FIGURES (analysis/figures/)
+---------------------------
+
+FSS Analysis (fss/):
+- complete_fss_analysis_20250620_212134.png
+- enhanced_fss_analysis_20250620_212318.png  
+- fss_critical_point_extrapolation_20250620_212134.png
+- fss_susceptibility_scaling_20250620_212134.png
+
+Susceptibility Maps (susceptibility/):
+- figure1_susceptibility_maps.png (main reference)
+- figure1_updated_susceptibility_maps_20250620_212619.png
+
+Ridge Analysis (ridge/):
+- critical_ridge_structure.png (main reference)
+- critical_ridge_structure_20250620_213034.png
+- figure1_ridge_emphasis_20250620_212754.png
+- n96_ridge_analysis_comprehensive_20250620_205336.png
+- n96_ridge_scan_visualization_20250620_194233.png
+- ridge_alignment.png (enhanced 2D view)
+- ridge_alignment_enhanced_20250620_213136.png
+
+SCRIPTS (analysis/scripts/)
+---------------------------
+
+FSS Analysis (fss/):
+- complete_fss_analysis.py
+- complete_fss_analysis_corrected.py
+- enhanced_fss_analysis.py
+- quick_fss_analysis.py
+- analyze_complete_fss.py
+- debug_fss_analysis.py
+- fix_fss_analysis.py
+- complete_fss_analysis.py
+
+Visualization (visualization/):
+- create_updated_figure1.py
+- create_figure1_ridge_emphasis.py  
+- create_critical_ridge_figure.py
+- create_ridge_alignment_figure.py
+- create_figure4.py
+- create_paper_figures.py
+- publication_figures.py
+- visualize_fss.py
+
+Ridge Analysis (ridge/):
+- analyze_n96_ridge.py
+- analyze_existing_n96_ridge.py
+- generate_n96_ridge_scan.py
+- critical_ridge_finder.py
+
+Data Processing (data_processing/):
+- verify_n96_peak.py
+- quick_verify_n96.py
+- analyze_n96_verification.py
+- generate_n96_critical.py
+- monitor_ridge_progress.py
+
+RESULTS (analysis/results/)
+---------------------------
+- enhanced_fss_results_20250620_212318.json
+- fss_results_20250620_212135.json
+- ridge_structure_analysis.txt
+- run_n96_ridge_scan.sh
+
+DATA FILES (analysis/data/)
+---------------------------
+- n96_ridge_points.csv (43 points for adaptive scan)
+- verification_points.csv
+- quick_verification_points.csv
+
+PAPERS ORGANIZATION (papers/)
+-----------------------------
+Each paper now in its own subfolder:
+- AIB_continuum_proof/
+- dougal_invariant_RG_analysis/
+- lorentzian_causality/
+- low_energy_gauge_gravity/
+- nonlinear_AIB_continuum_proof/
+- relational_contrast_framework/
+- sim_phase_trans_prelim/
+
+Each folder contains:
+- .tex source file
+- .pdf compiled output
+- .aux, .log, .out, .toc auxiliary files
+- .bib files where applicable
+
+SUMMARY
+-------
+Total new analysis files: ~50+
+Key results documented in: analysis/README.md
+All files organized by type and purpose
+Original scripts preserved in scripts/ directory
