@@ -1,0 +1,175 @@
+--- a/src/graph.rs
++++ b/src/graph.rs
+@@ -1,6 +1,7 @@
+ use rand::prelude::*;
+ use rand_distr::Exp1;
+ use serde::{Deserialize, Serialize};
++use std::collections::HashMap;
+ 
+ /// Complete graph of `N` nodes. Each link has a positive weight and a U(1) phase.
+ pub struct Graph {
+@@ -8,6 +9,10 @@ pub struct Graph {
+     links: Vec<Link>,
+     /// Pre‑computed list of all unordered triangles.
+     triangles: Vec<(usize, usize, usize)>,
++    /// Cache for triangle sum to enable O(1) access
++    triangle_sum_cache: f64,
++    /// Map from edge (i,j) to list of triangle indices containing that edge
++    triangles_by_edge: HashMap<(usize, usize), Vec<usize>>,
+ }
+ 
+ #[derive(Clone, Copy, Serialize, Deserialize)]
+@@ -99,10 +104,31 @@ impl Graph {
+                 }
+             }
+         }
++        
++        // Build edge-to-triangle index for O(N) updates
++        let mut triangles_by_edge = HashMap::new();
++        for (tri_idx, &(i, j, k)) in triangles.iter().enumerate() {
++            // Each triangle has 3 edges: (i,j), (j,k), (i,k)
++            let edges = vec![(i, j), (j, k), (i, k)];
++            for (a, b) in edges {
++                let canonical_edge = if a < b { (a, b) } else { (b, a) };
++                triangles_by_edge
++                    .entry(canonical_edge)
++                    .or_insert_with(Vec::new)
++                    .push(tri_idx);
++            }
++        }
+ 
+-        Self {
++        let mut graph = Self {
+             nodes,
+             links,
+             triangles,
++            triangle_sum_cache: 0.0,
++            triangles_by_edge,
++        };
++        
++        // Initialize triangle sum cache
++        graph.triangle_sum_cache = graph.compute_full_triangle_sum();
++        graph
+     }
+
+@@ -164,7 +190,15 @@ impl Graph {
+ 
+     /// ∑_{triangles} 3 cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
+     pub fn triangle_sum(&self) -> f64 {
++        self.triangle_sum_cache
++    }
++    
++    /// Compute triangle sum from scratch - O(N³)
++    /// Only used during initialization or for verification
++    fn compute_full_triangle_sum(&self) -> f64 {
+         self.triangles.iter().map(|&(i, j, k)| {
+             let t_ij = self.links[self.link_index(i, j)].theta;
+             let t_jk = self.links[self.link_index(j, k)].theta;
+@@ -172,6 +206,52 @@ impl Graph {
+             3.0 * (t_ij + t_jk + t_ki).cos()
+         }).sum()
+     }
++    
++    /// Compute change in triangle sum when link (i,j) phase changes by delta_theta
++    /// This is O(N) instead of O(N³) since each edge is in exactly (N-2) triangles
++    fn compute_triangle_sum_delta(&self, i: usize, j: usize, old_theta: f64, new_theta: f64) -> f64 {
++        let canonical_edge = if i < j { (i, j) } else { (j, i) };
++        
++        if let Some(triangle_indices) = self.triangles_by_edge.get(&canonical_edge) {
++            let mut delta = 0.0;
++            
++            for &tri_idx in triangle_indices {
++                let (a, b, c) = self.triangles[tri_idx];
++                
++                // Get the three angles of the triangle
++                let mut theta_ab = self.links[self.link_index(a, b)].theta;
++                let mut theta_bc = self.links[self.link_index(b, c)].theta;
++                let mut theta_ca = self.links[self.link_index(c, a)].theta;
++                
++                // Update the angle for the edge being modified
++                if (a == i && b == j) || (a == j && b == i) {
++                    theta_ab = new_theta;
++                } else if (b == i && c == j) || (b == j && c == i) {
++                    theta_bc = new_theta;
++                } else if (c == i && a == j) || (c == j && a == i) {
++                    theta_ca = new_theta;
++                }
++                
++                // Compute new contribution
++                let new_contrib = 3.0 * (theta_ab + theta_bc + theta_ca).cos();
++                
++                // Compute old contribution (with original theta)
++                let mut theta_ab_old = self.links[self.link_index(a, b)].theta;
++                let mut theta_bc_old = self.links[self.link_index(b, c)].theta;
++                let mut theta_ca_old = self.links[self.link_index(c, a)].theta;
++                
++                let old_contrib = 3.0 * (theta_ab_old + theta_bc_old + theta_ca_old).cos();
++                
++                delta += new_contrib - old_contrib;
++            }
++            
++            delta
++        } else {
++            // This shouldn't happen for valid edges
++            0.0
++        }
++    }
+
+     /// S_Δ(α) = α × triangle_sum
+     pub fn triangle_action(&self, alpha: f64) -> f64 {
+@@ -225,14 +305,37 @@ impl Graph {
+         delta_theta: f64,
+         rng: &mut impl Rng,
+     ) -> StepInfo {
+-        let s_before = self.action(alpha, beta);
+         let proposal = self.propose_update(delta_z, delta_theta, rng);
+-        let s_after = self.action(alpha, beta);
+-        let delta_s = s_after - s_before;
++        
++        // Calculate action change incrementally
++        let delta_s = match &proposal {
++            Proposal::ZUpdate { idx, old_z, new_z } => {
++                // Z-update only affects entropy term
++                let old_w = (-old_z).exp();
++                let new_w = (-new_z).exp();
++                let delta_entropy = new_w * new_z - old_w * old_z;
++                beta * delta_entropy
++            }
++            Proposal::PhaseUpdate { idx, old_theta, new_theta } => {
++                // Phase update only affects triangle term - use O(N) incremental update
++                let link = &self.links[*idx];
++                let delta_triangle = self.compute_triangle_sum_delta(
++                    link.i, link.j, *old_theta, *new_theta
++                );
++                alpha * delta_triangle
++            }
++        };
+
+         let accept = if delta_s <= 0.0 {
+             true
+         } else {
+             rng.gen::<f64>() < (-delta_s).exp()
+         };
+@@ -241,12 +344,20 @@ impl Graph {
+         if accept {
+             match proposal {
+                 Proposal::ZUpdate { idx, old_z, new_z } => {
++                    // Z-update accepted - no change to triangle sum
+                     let delta_w = (-new_z).exp() - (-old_z).exp();
+                     StepInfo {
+                         accept: true,
+                         delta_w,
+                         delta_cos: 0.0,
+                     }
+                 }
+                 Proposal::PhaseUpdate { idx, old_theta, new_theta } => {
++                    // Phase update accepted - update triangle sum cache
++                    let link = &self.links[idx];
++                    let delta_triangle = self.compute_triangle_sum_delta(
++                        link.i, link.j, old_theta, new_theta
++                    );
++                    self.triangle_sum_cache += delta_triangle;
++                    
+                     let w = (-self.links[idx].z).exp();
+                     let delta_cos = w * (new_theta.cos() - old_theta.cos());
+                     StepInfo {

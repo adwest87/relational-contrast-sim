@@ -1,0 +1,222 @@
+diff --git a/src/graph.rs b/src/graph.rs
+index 1234567..abcdefg 100644
+--- a/src/graph.rs
++++ b/src/graph.rs
+@@ -1,6 +1,7 @@
+ use rand::prelude::*;
+ use rand_distr::Exp1;
+ use serde::{Deserialize, Serialize};
++use std::collections::HashMap;
+ 
+ /// Complete graph of `N` nodes. Each link has a positive weight and a U(1) phase.
+ pub struct Graph {
+@@ -8,6 +9,10 @@ pub struct Graph {
+     links: Vec<Link>,
+     /// Pre‑computed list of all unordered triangles.
+     triangles: Vec<(usize, usize, usize)>,
++    /// Cache for triangle sum to enable O(1) access
++    triangle_sum_cache: f64,
++    /// Map from edge (i,j) to list of triangle indices containing that edge
++    triangles_by_edge: HashMap<(usize, usize), Vec<usize>>,
+ }
+ 
+ #[derive(Clone, Copy, Serialize, Deserialize)]
+@@ -100,10 +105,36 @@ impl Graph {
+             }
+         }
+ 
+-        Self {
++        // Build edge-to-triangle index for O(N) updates
++        let mut triangles_by_edge = HashMap::new();
++        for (tri_idx, &(i, j, k)) in triangles.iter().enumerate() {
++            // Each triangle has 3 edges: (i,j), (j,k), (i,k)
++            let edges = vec![(i, j), (j, k), (i, k)];
++            for (a, b) in edges {
++                let canonical = if a < b { (a, b) } else { (b, a) };
++                triangles_by_edge
++                    .entry(canonical)
++                    .or_insert_with(Vec::new)
++                    .push(tri_idx);
++            }
++        }
++
++        let mut graph = Self {
+             nodes,
+             links,
+             triangles,
++            triangle_sum_cache: 0.0,
++            triangles_by_edge,
++        };
++        
++        // Initialize triangle sum cache
++        graph.triangle_sum_cache = graph.triangles.iter().map(|&(i, j, k)| {
++            let t_ij = graph.links[graph.link_index(i, j)].theta;
++            let t_jk = graph.links[graph.link_index(j, k)].theta;
++            let t_ki = graph.links[graph.link_index(k, i)].theta;
++            3.0 * (t_ij + t_jk + t_ki).cos()
++        }).sum();
++        
++        graph
+     }
+ 
+     /// Convenience method: Create an unweighted (`w = 1`) complete graph.
+@@ -164,6 +195,13 @@ impl Graph {
+ 
+     /// ∑_{triangles} 3 cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
+     pub fn triangle_sum(&self) -> f64 {
++        self.triangle_sum_cache
++    }
++    
++    /// Compute triangle sum from scratch - O(N³)
++    /// Only used during initialization or for verification
++    #[allow(dead_code)]
++    fn compute_full_triangle_sum(&self) -> f64 {
+         self.triangles.iter().map(|&(i, j, k)| {
+             let t_ij = self.links[self.link_index(i, j)].theta;
+             let t_jk = self.links[self.link_index(j, k)].theta;
+@@ -172,6 +210,50 @@ impl Graph {
+         }).sum()
+     }
+ 
++    /// Compute change in triangle sum when link phase changes - O(N)
++    fn triangle_sum_delta_for_phase_change(
++        &self, 
++        link_idx: usize,
++        new_theta: f64
++    ) -> f64 {
++        let link = &self.links[link_idx];
++        let (i, j) = (link.i, link.j);
++        let canonical = if i < j { (i, j) } else { (j, i) };
++        
++        let mut delta = 0.0;
++        
++        if let Some(tri_indices) = self.triangles_by_edge.get(&canonical) {
++            for &tri_idx in tri_indices {
++                let (a, b, c) = self.triangles[tri_idx];
++                
++                // Get current angles
++                let t_ab = self.links[self.link_index(a, b)].theta;
++                let t_bc = self.links[self.link_index(b, c)].theta;
++                let t_ca = self.links[self.link_index(c, a)].theta;
++                
++                // Calculate old contribution
++                let old_contrib = 3.0 * (t_ab + t_bc + t_ca).cos();
++                
++                // Calculate new contribution with updated angle
++                let (t_ab_new, t_bc_new, t_ca_new) = 
++                    if (a == i && b == j) || (a == j && b == i) {
++                        (new_theta, t_bc, t_ca)
++                    } else if (b == i && c == j) || (b == j && c == i) {
++                        (t_ab, new_theta, t_ca)
++                    } else if (c == i && a == j) || (c == j && a == i) {
++                        (t_ab, t_bc, new_theta)
++                    } else {
++                        // This shouldn't happen if indices are correct
++                        (t_ab, t_bc, t_ca)
++                    };
++                
++                let new_contrib = 3.0 * (t_ab_new + t_bc_new + t_ca_new).cos();
++                delta += new_contrib - old_contrib;
++            }
++        }
++        
++        delta
++    }
++
+     /// S_Δ(α) = α × triangle_sum
+     pub fn triangle_action(&self, alpha: f64) -> f64 {
+         alpha * self.triangle_sum()
+@@ -224,9 +306,8 @@ impl Graph {
+         delta_theta: f64,
+         rng: &mut impl Rng,
+     ) -> StepInfo {
+-        let s_before = self.action(alpha, beta);
+-        let proposal = self.propose_update(delta_z, delta_theta, rng);
+-        let s_after = self.action(alpha, beta);
++        // Select random link and update type
++        let link_index = rng.gen_range(0..self.links.len());
++        let link = &self.links[link_index];
+         
+-        let delta_s = s_after - s_before;
++        let phase_only = delta_z == 0.0;
++        let do_z_update = !phase_only && rng.gen_bool(0.5);
++        
++        if do_z_update {
++            // Z-update: only affects entropy term
++            let old_z = link.z;
++            let old_w = (-old_z).exp();
++            let new_z = (old_z + rng.gen_range(-delta_z..=delta_z)).max(0.001);
++            let new_w = (-new_z).exp();
++            
++            let delta_entropy = new_w * new_z - old_w * old_z;
++            let delta_s = beta * delta_entropy;
++            
++            let accept = delta_s <= 0.0 || rng.gen_range(0.0..1.0) < (-delta_s).exp();
++            
++            if accept {
++                self.links[link_index].z = new_z;
++                StepInfo {
++                    accept: true,
++                    delta_w: new_w - old_w,
++                    delta_cos: 0.0,
++                }
++            } else {
++                StepInfo { 
++                    accept: false, 
++                    delta_w: 0.0, 
++                    delta_cos: 0.0 
++                }
++            }
++        } else {
++            // Phase update: use incremental triangle calculation
++            let old_theta = link.theta;
++            let new_theta = old_theta + rng.gen_range(-delta_theta..=delta_theta);
++            
++            // O(N) calculation instead of O(N³)
++            let delta_triangle = self.triangle_sum_delta_for_phase_change(
++                link_index, 
++                new_theta
++            );
++            let delta_s = alpha * delta_triangle;
++            
++            let accept = delta_s <= 0.0 || rng.gen_range(0.0..1.0) < (-delta_s).exp();
++            
++            if accept {
++                self.links[link_index].theta = new_theta;
++                self.triangle_sum_cache += delta_triangle;  // Update cache
++                
++                let w = (-link.z).exp();
++                let delta_cos = w * (new_theta.cos() - old_theta.cos());
++                
++                StepInfo {
++                    accept: true,
++                    delta_w: 0.0,
++                    delta_cos,
++                }
++            } else {
++                StepInfo { 
++                    accept: false, 
++                    delta_w: 0.0, 
++                    delta_cos: 0.0 
++                }
++            }
++        }
++    }
+ 
++    /// Original metropolis step - preserved for compatibility/testing
++    #[allow(dead_code)]
++    pub fn metropolis_step_original(
++        &mut self,
++        alpha: f64,
++        beta: f64,
++        delta_z: f64,
++        delta_theta: f64,
++        rng: &mut impl Rng,
++    ) -> StepInfo {
++        let s_before = self.action(alpha, beta);
++        let proposal = self.propose_update(delta_z, delta_theta, rng);
++        let s_after = self.action(alpha, beta);
++        let delta_s = s_after - s_before;
++        
+         let accept = if delta_s <= 0.0 {
+             true

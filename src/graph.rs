@@ -33,7 +33,7 @@ impl Link {
 }
 
 /// A simple undirected complete graph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,

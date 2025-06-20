@@ -2,7 +2,7 @@
 
 use crate::graph::Graph;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Observables {
     // Basic observables
     pub mean_w: f64,
