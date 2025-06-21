@@ -648,6 +648,7 @@ dependencies = [
  "indicatif",
  "metal",
  "nalgebra",
+ "num-complex",
  "objc",
  "rand",
  "rand_chacha",

@@ -108,5 +108,19 @@ src/bin/* → CSV files → Python analysis scripts → Figures/Results
 
 - `src/graph.rs` - Core data structures and metropolis algorithm
 - `src/fast_mc_integration.rs` - Production MC runner architecture  
-- `src/bin/unconventional_physics.rs` - Comprehensive physics analysis
-- `UNCONVENTIONAL_PHYSICS_REPORT.md` - Summary of key findings
+- `src/bin/physics_analysis/unconventional_physics.rs` - Comprehensive physics analysis
+- `docs/UNCONVENTIONAL_PHYSICS_REPORT.md` - Summary of key findings
+
+## Recent Changes
+- Added M1 GPU Metal shader support for massive speedup
+- Optimized importance sampling for critical region exploration
+- Implemented ridge-biased sampling along α=3β line
+- Added incremental triangle sum updates
+- Organized project structure:
+  - `src/bin/physics_analysis/` - Physics investigation tools
+  - `src/bin/debug/` - Debug and diagnostic utilities
+  - `src/bin/validation/` - Validation scripts
+  - `papers/classical_spin_liquid/` - LaTeX paper and figures
+  - `data/` - CSV and data files
+  - `scripts/` - Python analysis scripts
+  - `docs/` - Documentation and reports
