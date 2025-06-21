@@ -204,6 +204,20 @@ impl M1Graph {
         i * n - i * (i + 1) / 2 + j - i - 1
     }
     
+    /// Get phase with proper antisymmetry: θ_ij if i < j, -θ_ij if i > j
+    #[inline(always)]
+    pub fn get_phase(&self, from_node: usize, to_node: usize) -> f64 {
+        if from_node == to_node {
+            return 0.0;
+        }
+        let link_idx = self.link_index(from_node, to_node);
+        if from_node < to_node {
+            self.links[link_idx].theta
+        } else {
+            -self.links[link_idx].theta
+        }
+    }
+    
     /// SIMD-optimized entropy action
     pub fn entropy_action(&self) -> f64 {
         unsafe {
@@ -241,10 +255,9 @@ impl M1Graph {
         }
     }
     
-    /// Parallel triangle sum optimized for M1's core configuration
+    /// Parallel triangle sum optimized for M1's core configuration with proper antisymmetry
     pub fn triangle_sum(&self) -> f64 {
         let triangles = Arc::clone(&self.triangles);
-        let links = &self.links;
         
         // Use rayon to parallelize across M1's cores
         self.thread_pool.install(|| {
@@ -254,14 +267,12 @@ impl M1Graph {
                     let mut local_sum = 0.0;
                     
                     for &(i, j, k) in chunk {
-                        let idx_ij = self.link_index(i as usize, j as usize);
-                        let idx_jk = self.link_index(j as usize, k as usize);
-                        let idx_ik = self.link_index(i as usize, k as usize);
+                        // Use proper antisymmetric phases: θ_ji = -θ_ij
+                        let t_ij = self.get_phase(i as usize, j as usize);
+                        let t_jk = self.get_phase(j as usize, k as usize);
+                        let t_ki = self.get_phase(k as usize, i as usize);
                         
-                        let theta_sum = links[idx_ij].theta + 
-                                       links[idx_jk].theta + 
-                                       links[idx_ik].theta;
-                        
+                        let theta_sum = t_ij + t_jk + t_ki;
                         local_sum += theta_sum.cos();
                     }
                     

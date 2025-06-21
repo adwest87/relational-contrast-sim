@@ -31,7 +31,7 @@ impl OptimizedGraph {
         let mut links = Vec::new();
         for i in 0..n {
             for j in (i + 1)..n {
-                let z: f64 = -(rng.gen_range(0.0..1.0)).ln(); // exponential distribution
+                let z: f64 = -(rng.gen_range(0.0..1.0) as f64).ln(); // exponential distribution
                 links.push(Link {
                     i,
                     j,
@@ -166,7 +166,7 @@ impl OptimizedGraph {
         // Choose random link
         let link_index = rng.gen_range(0..self.links.len());
         let link = &self.links[link_index];
-        let (i, j) = (link.i, link.j);
+        let (_i, _j) = (link.i, link.j);
         
         // Decide update type
         let phase_only = delta_z == 0.0;

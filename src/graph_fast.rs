@@ -196,6 +196,20 @@ impl FastGraph {
         i * n - i * (i + 1) / 2 + j - i - 1
     }
     
+    /// Get phase with proper antisymmetry: θ_ij if i < j, -θ_ij if i > j
+    #[inline(always)]
+    pub fn get_phase(&self, from_node: usize, to_node: usize) -> f64 {
+        if from_node == to_node {
+            return 0.0;
+        }
+        let link_idx = self.link_index(from_node, to_node);
+        if from_node < to_node {
+            self.links[link_idx].theta
+        } else {
+            -self.links[link_idx].theta
+        }
+    }
+    
     /// Optimized entropy action using precomputed values
     #[inline(always)]
     pub fn entropy_action(&self) -> f64 {
@@ -210,7 +224,7 @@ impl FastGraph {
         sum
     }
     
-    /// Optimized triangle sum using precomputed trig values
+    /// Optimized triangle sum using precomputed trig values with proper antisymmetry
     pub fn triangle_sum(&self) -> f64 {
         let mut sum: f64 = 0.0;
         
@@ -218,13 +232,12 @@ impl FastGraph {
         const CHUNK_SIZE: usize = 16;
         for chunk in self.triangles.chunks(CHUNK_SIZE) {
             for &(i, j, k) in chunk {
-                let idx_ij = self.link_index(i as usize, j as usize);
-                let idx_jk = self.link_index(j as usize, k as usize);
-                let idx_ik = self.link_index(i as usize, k as usize);
+                // Use proper antisymmetric phases: θ_ji = -θ_ij
+                let t_ij = self.get_phase(i as usize, j as usize);
+                let t_jk = self.get_phase(j as usize, k as usize);
+                let t_ki = self.get_phase(k as usize, i as usize);
                 
-                let theta_sum = self.links[idx_ij].theta + 
-                               self.links[idx_jk].theta + 
-                               self.links[idx_ik].theta;
+                let theta_sum = t_ij + t_jk + t_ki;
                 
                 sum += theta_sum.cos();
             }
@@ -368,26 +381,20 @@ impl FastGraph {
         // Only check triangles containing edge (i,j)
         for k in 0..self.n() {
             if k != i && k != j {
-                let idx_ik = if i < k { 
-                    self.link_index(i, k) 
-                } else { 
-                    self.link_index(k, i) 
-                };
-                let idx_jk = if j < k { 
-                    self.link_index(j, k) 
-                } else { 
-                    self.link_index(k, j) 
-                };
+                // Use proper antisymmetric phases: θ_ji = -θ_ij
+                let t_ik = self.get_phase(i, k);
+                let t_jk = self.get_phase(j, k);
+                let t_ij_old = self.get_phase(i, j);
                 
-                let other_sum = self.links[idx_ik].theta + self.links[idx_jk].theta;
-                let old_total = old_theta + other_sum;
+                let old_total = t_ij_old + t_jk + t_ik;
                 
                 let contribution = if delta_theta.abs() < SMALL_DELTA_THRESHOLD {
                     // Use analytical derivative: d/dx[cos(x)] = -sin(x)
                     -old_total.sin() * delta_theta
                 } else {
                     // Use direct calculation for larger changes
-                    let new_total = new_theta + other_sum;
+                    let t_ij_new = if i < j { new_theta } else { -new_theta };
+                    let new_total = t_ij_new + t_jk + t_ik;
                     new_total.cos() - old_total.cos()
                 };
                 

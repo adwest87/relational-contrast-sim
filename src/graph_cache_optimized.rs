@@ -138,6 +138,20 @@ impl OptimizedGraph {
         (i, j)
     }
     
+    /// Get phase with proper antisymmetry: θ_ij if i < j, -θ_ij if i > j
+    #[inline(always)]
+    pub fn get_phase(&self, from_node: usize, to_node: usize) -> f32 {
+        if from_node == to_node {
+            return 0.0;
+        }
+        let link_idx = self.link_index(from_node, to_node);
+        if from_node < to_node {
+            self.links[link_idx].theta
+        } else {
+            -self.links[link_idx].theta
+        }
+    }
+    
     /// Entropy action with cache-friendly access
     pub fn entropy_action(&self) -> f64 {
         let mut sum = 0.0;
@@ -167,32 +181,21 @@ impl OptimizedGraph {
         sum
     }
     
-    /// Triangle sum using precomputed indices and values
+    /// Triangle sum using precomputed indices and values with proper antisymmetry
     pub fn triangle_sum(&self) -> f64 {
         let mut sum = 0.0;
         
         // Process triangles in chunks for better cache usage
         const CHUNK_SIZE: usize = 16;
-        let chunks = self.triangle_links.chunks(CHUNK_SIZE);
         
-        for chunk in chunks {
-            // Prefetch links for upcoming triangles
-            #[cfg(target_arch = "x86_64")]
-            unsafe {
-                use std::arch::x86_64::_mm_prefetch;
-                for tri_links in chunk.iter().take(4) {
-                    _mm_prefetch(&self.links[tri_links[0] as usize] as *const _ as *const i8, 1);
-                    _mm_prefetch(&self.links[tri_links[1] as usize] as *const _ as *const i8, 1);
-                    _mm_prefetch(&self.links[tri_links[2] as usize] as *const _ as *const i8, 1);
-                }
-            }
-            
-            for tri_links in chunk {
-                let link_ij = &self.links[tri_links[0] as usize];
-                let link_jk = &self.links[tri_links[1] as usize];
-                let link_ik = &self.links[tri_links[2] as usize];
+        for chunk in self.triangles.chunks(CHUNK_SIZE) {
+            for &(i, j, k) in chunk {
+                // Use proper antisymmetric phases: θ_ji = -θ_ij
+                let t_ij = self.get_phase(i as usize, j as usize);
+                let t_jk = self.get_phase(j as usize, k as usize);
+                let t_ki = self.get_phase(k as usize, i as usize);
                 
-                let theta_sum = link_ij.theta + link_jk.theta + link_ik.theta;
+                let theta_sum = t_ij + t_jk + t_ki;
                 sum += (theta_sum as f64).cos();
             }
         }
