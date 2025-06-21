@@ -1,11 +1,17 @@
 /target
 .DS_Store
 .ipynb_checkpoints/
+__pycache__/
+*.pyc
 *.csv
 *.svg
 *.png
 *.pdf
 *.ipynb
+
+# Results directory (generated data and figures)
+results/data/
+results/figures/
 
 # LaTeX files and papers
 papers/

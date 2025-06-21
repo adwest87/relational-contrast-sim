@@ -104,7 +104,7 @@ impl FastGraph {
         for i in 0..n {
             for j in (i + 1)..n {
                 let z = rng.gen_range(0.001..10.0);
-                let theta = rng.gen_range(0.0..TAU);  // Random angle [0, 2π)
+                let theta = rng.gen_range(-std::f64::consts::PI..std::f64::consts::PI);  // Random angle [-π, π)
                 links.push(FastLink::new(i, j, z, theta));
             }
         }
@@ -293,7 +293,10 @@ impl FastGraph {
                 let new_exp_neg_z = (-new_z).exp();
                 
                 // Fast entropy change calculation
-                let delta_entropy = (-new_z * new_exp_neg_z) - (-old_z * old_exp_neg_z);
+                // Entropy action S = -z * w = -z * exp(-z)
+                let old_entropy = -old_z * old_exp_neg_z;
+                let new_entropy = -new_z * new_exp_neg_z;
+                let delta_entropy = new_entropy - old_entropy;
                 let delta_s = beta * delta_entropy;
                 
                 // Use epsilon comparison for near-zero energy changes  
@@ -384,9 +387,10 @@ impl FastGraph {
                 // Use proper antisymmetric phases: θ_ji = -θ_ij
                 let t_ik = self.get_phase(i, k);
                 let t_jk = self.get_phase(j, k);
+                let t_ki = self.get_phase(k, i);  // Need t_ki, not t_ik!
                 let t_ij_old = self.get_phase(i, j);
                 
-                let old_total = t_ij_old + t_jk + t_ik;
+                let old_total = t_ij_old + t_jk + t_ki;
                 
                 let contribution = if delta_theta.abs() < SMALL_DELTA_THRESHOLD {
                     // Use analytical derivative: d/dx[cos(x)] = -sin(x)
@@ -394,7 +398,7 @@ impl FastGraph {
                 } else {
                     // Use direct calculation for larger changes
                     let t_ij_new = if i < j { new_theta } else { -new_theta };
-                    let new_total = t_ij_new + t_jk + t_ik;
+                    let new_total = t_ij_new + t_jk + t_ki;
                     new_total.cos() - old_total.cos()
                 };
                 
@@ -769,11 +773,11 @@ impl BatchedObservables {
         
         // Calculate susceptibility from magnetization fluctuations
         let susceptibility = if self.magnetization_accumulator.count > 10 {
-            // χ = N * (<m²> - <m>²)
+            // χ = N * β * (<m²> - <m>²)
             let mag_var = self.magnetization_accumulator.variance();
-            n * mag_var
+            n * beta * mag_var
         } else {
-            n * self.cached_values.var_w  // Fallback to old calculation
+            0.0  // Not enough data for variance calculation
         };
         
         // Calculate Binder cumulant from magnetization moments

@@ -71,6 +71,71 @@ impl UltraOptimizedGraph {
         Self::new_with_rng(&mut rng, n)
     }
     
+    /// Create UltraOptimizedGraph from Reference Graph (ensures identical initial state)
+    pub fn from_graph(reference: &crate::graph::Graph) -> Self {
+        let n = reference.n();
+        let num_links = n * (n - 1) / 2;
+        
+        // Allocate all arrays
+        let mut link_i = Vec::with_capacity(num_links);
+        let mut link_j = Vec::with_capacity(num_links);
+        let mut z_values = Vec::with_capacity(num_links);
+        let mut theta_values = Vec::with_capacity(num_links);
+        let mut cos_theta = Vec::with_capacity(num_links);
+        let mut sin_theta = Vec::with_capacity(num_links);
+        let mut exp_neg_z = Vec::with_capacity(num_links);
+        
+        // Copy data from reference graph (ensure identical ordering)
+        for link in &reference.links {
+            // Reference links are already ordered with i < j
+            assert!(link.i < link.j, "Reference link ordering violated");
+            
+            link_i.push(link.i as u32);
+            link_j.push(link.j as u32);
+            z_values.push(link.z);
+            theta_values.push(link.theta);
+            cos_theta.push(link.theta.cos());
+            sin_theta.push(link.theta.sin());
+            exp_neg_z.push((-link.z).exp());
+        }
+        
+        // Pre-compute triangle membership for each edge
+        let mut triangles_per_edge = vec![Vec::new(); num_links];
+        for link_idx in 0..num_links {
+            let i = link_i[link_idx] as usize;
+            let j = link_j[link_idx] as usize;
+            
+            // Find all k such that (i,j,k) forms a triangle
+            for k in 0..n {
+                if k != i && k != j {
+                    triangles_per_edge[link_idx].push(k);
+                }
+            }
+        }
+        
+        let mut graph = Self {
+            nodes: n,
+            link_i,
+            link_j,
+            z_values,
+            theta_values,
+            cos_theta,
+            sin_theta,
+            exp_neg_z,
+            triangle_sum_cache: 0.0,
+            triangles_per_edge,
+            spectral_cache: None,
+            use_spectral: false,
+            mc_steps: 0,
+            cache_hits: 0,
+        };
+        
+        // Initialize triangle sum cache
+        graph.triangle_sum_cache = graph.compute_full_triangle_sum();
+        
+        graph
+    }
+    
     /// Create new ultra-optimized graph with existing RNG
     pub fn new_with_rng(rng: &mut impl Rng, n: usize) -> Self {
         let num_links = n * (n - 1) / 2;

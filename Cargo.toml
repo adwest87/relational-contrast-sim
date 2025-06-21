@@ -58,10 +58,6 @@ name = "quick_validation"
 path = "src/bin/validation/quick_validation.rs"
 
 [[bin]]
-name = "debug_chi"
-path = "src/bin/debug/debug_chi.rs"
-
-[[bin]]
 name = "critical_finder"
 path = "src/bin/critical_finder.rs"
 
@@ -69,65 +65,6 @@ path = "src/bin/critical_finder.rs"
 name = "critical_finder_long"
 path = "src/bin/critical_finder_long.rs"
 
-[[bin]]
-name = "test_susceptibility"
-path = "src/bin/debug/test_susceptibility.rs"
-
-[[bin]]
-name = "debug_mc_physics"
-path = "src/bin/debug/debug_mc_physics.rs"
-
-[[bin]]
-name = "forensic_energy_audit"
-path = "src/bin/debug/forensic_energy_audit.rs"
-
-[[bin]]
-name = "debug_zero_moves"
-path = "src/bin/debug/debug_zero_moves.rs"
-
-[[bin]]
-name = "debug_no_op_detailed"
-path = "src/bin/debug/debug_no_op_detailed.rs"
-
-[[bin]]
-name = "trace_noop_rejection"
-path = "src/bin/debug/trace_noop_rejection.rs"
-
-[[bin]]
-name = "simple_metropolis_test"
-path = "src/bin/debug/simple_metropolis_test.rs"
-
-[[bin]]
-name = "precision_tracer"
-path = "src/bin/debug/precision_tracer.rs"
-
-[[bin]]
-name = "debug_metropolis_internal"
-path = "src/bin/debug/debug_metropolis_internal.rs"
-
-[[bin]]
-name = "ultra_precision_tracer"
-path = "src/bin/debug/ultra_precision_tracer.rs"
-
-[[bin]]
-name = "direct_debug_trace"
-path = "src/bin/debug/direct_debug_trace.rs"
-
-[[bin]]
-name = "simple_debug_test"
-path = "src/bin/debug/simple_debug_test.rs"
-
-[[bin]]
-name = "focused_debug"
-path = "src/bin/debug/focused_debug.rs"
-
-[[bin]]
-name = "precision_analysis"
-path = "src/bin/debug/precision_analysis.rs"
-
-[[bin]]
-name = "improved_triangle_delta"
-path = "src/bin/debug/improved_triangle_delta.rs"
 
 [[bin]]
 name = "unconventional_physics"
