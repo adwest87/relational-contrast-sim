@@ -478,6 +478,88 @@ impl FastGraph {
     pub fn get_autocorr_tau(&self) -> f64 {
         self.autocorr_tau
     }
+    
+    /// Calculate correlation length from susceptibility and finite-size scaling
+    /// For a finite system: χ ~ N^(γ/ν) at criticality
+    /// Away from criticality: χ ~ ξ^γ where ξ is correlation length
+    /// Simple approximation: ξ ~ (χ/N)^(1/2) in mean field
+    pub fn correlation_length_from_susceptibility(&self, susceptibility: f64) -> f64 {
+        let n = self.n() as f64;
+        // More sophisticated: account for system size effects
+        // ξ = min(L/2, sqrt(χ/N)) where L ~ N^(1/d) and d is effective dimension
+        let system_size = n.powf(0.5); // Effective 2D-like for complete graph
+        let xi_est = (susceptibility / n).sqrt();
+        xi_est.min(system_size / 2.0)
+    }
+    
+    /// Calculate connected correlation function G(r) = <s_i s_j> - <s_i><s_j>
+    /// For complete graph, all nodes are distance 1 apart
+    pub fn correlation_function(&self) -> (f64, f64) {
+        // For complete graph, we calculate node-based correlations
+        // First, compute average phase on each node
+        let n = self.n();
+        let mut node_phases = vec![0.0; n];
+        let mut node_degrees = vec![0; n];
+        
+        for link in &self.links {
+            let (i, j) = (link.i as usize, link.j as usize);
+            node_phases[i] += link.cos_theta;
+            node_phases[j] += link.cos_theta;
+            node_degrees[i] += 1;
+            node_degrees[j] += 1;
+        }
+        
+        // Average phase per node
+        for i in 0..n {
+            if node_degrees[i] > 0 {
+                node_phases[i] /= node_degrees[i] as f64;
+            }
+        }
+        
+        let mean_phase: f64 = node_phases.iter().sum::<f64>() / n as f64;
+        
+        // G(0) = <s_i^2> - <s_i>^2
+        let g0 = node_phases.iter()
+            .map(|&s| s * s)
+            .sum::<f64>() / n as f64 - mean_phase * mean_phase;
+        
+        // G(1) = average correlation between connected nodes minus <s>^2
+        let mut g1_sum = 0.0;
+        let mut g1_count = 0;
+        
+        for link in &self.links {
+            let (i, j) = (link.i as usize, link.j as usize);
+            g1_sum += node_phases[i] * node_phases[j];
+            g1_count += 1;
+        }
+        
+        let g1 = if g1_count > 0 {
+            g1_sum / g1_count as f64 - mean_phase * mean_phase
+        } else {
+            0.0
+        };
+        
+        (g0, g1)
+    }
+    
+    /// Calculate correlation length from correlation function
+    /// ξ = sqrt(<r²·C(r)> / <C(r)>) where C(r) is the correlation function
+    pub fn calculate_correlation_length(&self) -> f64 {
+        let (g0, g1) = self.correlation_function();
+        
+        // For complete graph, all non-self pairs are at distance 1
+        // <r²·C(r)> = 0²·G(0) + 1²·G(1) = G(1)
+        // <C(r)> = G(0) + G(1)
+        
+        let numerator = g1.abs();  // r² = 1 for all connected pairs
+        let denominator = g0 + g1.abs();
+        
+        if denominator > 1e-10 {
+            (numerator / denominator).sqrt()
+        } else {
+            0.0
+        }
+    }
 }
 
 /// Step information
@@ -503,6 +585,12 @@ impl StepInfo {
 pub struct BatchedObservables {
     rotation_counter: usize,
     cached_values: ObservableCache,
+    // Time series accumulators for fluctuation-based observables
+    energy_accumulator: TimeSeriesAccumulator,
+    magnetization_accumulator: TimeSeriesAccumulator,
+    // Full time series for advanced error analysis (optional)
+    energy_time_series: Option<Vec<f64>>,
+    magnetization_time_series: Option<Vec<f64>>,
 }
 
 #[derive(Default)]
@@ -513,6 +601,68 @@ struct ObservableCache {
     entropy: f64,
     triangle_sum: f64,
     _last_update: usize,
+    // Additional cached values
+    mean_cos_sq: f64,
+    mean_cos_4th: f64,
+    correlation_length: f64,
+}
+
+/// Time series accumulator for calculating fluctuations and higher moments
+#[derive(Clone, Default)]
+struct TimeSeriesAccumulator {
+    sum: f64,
+    sum_sq: f64,
+    sum_4th: f64,
+    count: usize,
+}
+
+impl TimeSeriesAccumulator {
+    fn push(&mut self, value: f64) {
+        self.sum += value;
+        self.sum_sq += value * value;
+        self.sum_4th += value.powi(4);
+        self.count += 1;
+    }
+    
+    fn mean(&self) -> f64 {
+        if self.count > 0 {
+            self.sum / self.count as f64
+        } else {
+            0.0
+        }
+    }
+    
+    fn variance(&self) -> f64 {
+        if self.count > 1 {
+            let n = self.count as f64;
+            (self.sum_sq - self.sum * self.sum / n) / (n - 1.0)
+        } else {
+            0.0
+        }
+    }
+    
+    fn moment2(&self) -> f64 {
+        if self.count > 0 {
+            self.sum_sq / self.count as f64
+        } else {
+            0.0
+        }
+    }
+    
+    fn moment4(&self) -> f64 {
+        if self.count > 0 {
+            self.sum_4th / self.count as f64
+        } else {
+            0.0
+        }
+    }
+    
+    fn reset(&mut self) {
+        self.sum = 0.0;
+        self.sum_sq = 0.0;
+        self.sum_4th = 0.0;
+        self.count = 0;
+    }
 }
 
 impl Default for BatchedObservables {
@@ -526,7 +676,17 @@ impl BatchedObservables {
         Self {
             rotation_counter: 0,
             cached_values: ObservableCache::default(),
+            energy_accumulator: TimeSeriesAccumulator::default(),
+            magnetization_accumulator: TimeSeriesAccumulator::default(),
+            energy_time_series: None,
+            magnetization_time_series: None,
         }
+    }
+    
+    /// Enable full time series collection for advanced error analysis
+    pub fn enable_time_series(&mut self) {
+        self.energy_time_series = Some(Vec::new());
+        self.magnetization_time_series = Some(Vec::new());
     }
     
     /// Measure observables with rotation for expensive calculations
@@ -537,18 +697,41 @@ impl BatchedObservables {
         let sum_w: f64 = graph.links.iter().map(|l| l.exp_neg_z).sum();
         let sum_cos: f64 = graph.links.iter().map(|l| l.cos_theta).sum();
         let m = graph.m() as f64;
+        let n = graph.n() as f64;
         
         let mean_w = sum_w / m;
         let mean_cos = sum_cos / m;
         
+        // Calculate energy for time series
+        let current_energy = graph.action(alpha, beta);
+        self.energy_accumulator.push(current_energy);
+        
+        // Calculate magnetization: m = (1/N)∑cos(θ) where sum is over all links
+        // For a complete graph with N nodes and N(N-1)/2 links
+        let magnetization = sum_cos / n;  // Normalized by number of nodes
+        self.magnetization_accumulator.push(magnetization);
+        
+        // Store in full time series if enabled
+        if let Some(ref mut series) = self.energy_time_series {
+            series.push(current_energy);
+        }
+        if let Some(ref mut series) = self.magnetization_time_series {
+            series.push(magnetization);
+        }
+        
         // Rotate expensive calculations
-        match self.rotation_counter % 5 {
+        match self.rotation_counter % 6 {
             0 => {
-                // Update variance (expensive)
-                let var_w = graph.links.iter()
-                    .map(|l| (l.exp_neg_z - mean_w).powi(2))
-                    .sum::<f64>() / m;
-                self.cached_values.var_w = var_w;
+                // Update variance and higher moments for cos
+                let (var_w, cos_sq, cos_4th) = graph.links.iter()
+                    .fold((0.0, 0.0, 0.0), |(vw, c2, c4), l| {
+                        let w = l.exp_neg_z;
+                        let c = l.cos_theta;
+                        (vw + (w - mean_w).powi(2), c2 + c*c, c4 + c.powi(4))
+                    });
+                self.cached_values.var_w = var_w / m;
+                self.cached_values.mean_cos_sq = cos_sq / m;
+                self.cached_values.mean_cos_4th = cos_4th / m;
             }
             1 => {
                 // Update entropy
@@ -558,19 +741,89 @@ impl BatchedObservables {
                 // Update triangle sum (most expensive)
                 self.cached_values.triangle_sum = graph.triangle_sum();
             }
+            3 => {
+                // Update correlation length from correlation function
+                self.cached_values.correlation_length = graph.calculate_correlation_length();
+            }
             _ => {}  // Use cached values
         }
         
         self.cached_values.mean_w = mean_w;
         self.cached_values.mean_cos = mean_cos;
         
+        // Calculate specific heat from energy fluctuations
+        let specific_heat = if self.energy_accumulator.count > 10 {
+            // C = (1/N) * (<E²> - <E>²)
+            let energy_var = self.energy_accumulator.variance();
+            energy_var / n
+        } else {
+            0.0
+        };
+        
+        // Calculate susceptibility from magnetization fluctuations
+        let susceptibility = if self.magnetization_accumulator.count > 10 {
+            // χ = N * (<m²> - <m>²)
+            let mag_var = self.magnetization_accumulator.variance();
+            n * mag_var
+        } else {
+            n * self.cached_values.var_w  // Fallback to old calculation
+        };
+        
+        // Calculate Binder cumulant from magnetization moments
+        let binder_cumulant = if self.magnetization_accumulator.count > 10 {
+            // U4 = 1 - <m⁴>/(3<m²>²)
+            let m2 = self.magnetization_accumulator.moment2();
+            let m4 = self.magnetization_accumulator.moment4();
+            if m2 > 1e-10 {
+                1.0 - m4 / (3.0 * m2 * m2)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+        
         QuickObservables {
             mean_w,
             var_w: self.cached_values.var_w,
             mean_cos,
             mean_action: beta * self.cached_values.entropy + alpha * self.cached_values.triangle_sum,
-            susceptibility: graph.n() as f64 * self.cached_values.var_w,
+            susceptibility,
+            specific_heat,
+            binder_cumulant,
+            correlation_length: self.cached_values.correlation_length,
+            // Error estimates initialized to 0 (need separate jackknife analysis)
+            specific_heat_err: 0.0,
+            susceptibility_err: 0.0,
+            binder_cumulant_err: 0.0,
         }
+    }
+    
+    /// Reset time series accumulators (useful when changing parameters)
+    pub fn reset_accumulators(&mut self) {
+        self.energy_accumulator.reset();
+        self.magnetization_accumulator.reset();
+        if let Some(ref mut series) = self.energy_time_series {
+            series.clear();
+        }
+        if let Some(ref mut series) = self.magnetization_time_series {
+            series.clear();
+        }
+    }
+    
+    /// Get number of accumulated samples
+    pub fn sample_count(&self) -> usize {
+        self.energy_accumulator.count
+    }
+    
+    /// Get energy time series (if enabled)
+    pub fn energy_time_series(&self) -> Option<&[f64]> {
+        self.energy_time_series.as_deref()
+    }
+    
+    /// Get magnetization time series (if enabled)
+    pub fn magnetization_time_series(&self) -> Option<&[f64]> {
+        self.magnetization_time_series.as_deref()
     }
 }
 
@@ -582,4 +835,73 @@ pub struct QuickObservables {
     pub mean_cos: f64,
     pub mean_action: f64,
     pub susceptibility: f64,
+    pub specific_heat: f64,
+    pub binder_cumulant: f64,
+    pub correlation_length: f64,
+    // Error estimates (filled in by jackknife analysis)
+    pub specific_heat_err: f64,
+    pub susceptibility_err: f64,
+    pub binder_cumulant_err: f64,
+}
+
+/// Jackknife error estimation
+pub struct JackknifeEstimator {
+    samples: Vec<f64>,
+}
+
+impl JackknifeEstimator {
+    pub fn new() -> Self {
+        Self {
+            samples: Vec::new(),
+        }
+    }
+    
+    pub fn add_sample(&mut self, value: f64) {
+        self.samples.push(value);
+    }
+    
+    pub fn estimate_error<F>(&self, estimator: F) -> (f64, f64)
+    where
+        F: Fn(&[f64]) -> f64,
+    {
+        let n = self.samples.len();
+        if n < 2 {
+            return (0.0, 0.0);
+        }
+        
+        // Full sample estimate
+        let full_estimate = estimator(&self.samples);
+        
+        // Jackknife estimates
+        let mut jackknife_estimates = Vec::with_capacity(n);
+        
+        for i in 0..n {
+            // Create subsample excluding i-th element
+            let mut subsample = Vec::with_capacity(n - 1);
+            for (j, &val) in self.samples.iter().enumerate() {
+                if i != j {
+                    subsample.push(val);
+                }
+            }
+            
+            let jack_estimate = estimator(&subsample);
+            jackknife_estimates.push(jack_estimate);
+        }
+        
+        // Jackknife mean
+        let jack_mean: f64 = jackknife_estimates.iter().sum::<f64>() / n as f64;
+        
+        // Jackknife variance
+        let jack_var: f64 = jackknife_estimates.iter()
+            .map(|&x| (x - jack_mean).powi(2))
+            .sum::<f64>() * (n - 1) as f64 / n as f64;
+        
+        let error = jack_var.sqrt();
+        
+        (full_estimate, error)
+    }
+    
+    pub fn clear(&mut self) {
+        self.samples.clear();
+    }
 }

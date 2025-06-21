@@ -3,6 +3,7 @@
 use crate::projector::{aib_project, frobenius_norm};
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
+use nalgebra::{DMatrix, SymmetricEigen};
 
 /// A vertex in the network.
 #[derive(Debug, Clone)]
@@ -11,12 +12,14 @@ pub struct Node {
 }
 
 /// An undirected edge with z = -ln(w) and a U(1) phase.
+/// The phase theta represents θ_ij where i < j (enforced at construction).
+/// When accessed as θ_ji, it returns -θ_ij to maintain antisymmetry.
 #[derive(Debug, Clone)]
 pub struct Link {
-    pub i: usize,
-    pub j: usize,
-    pub z: f64,  // z = -ln(w), so w = exp(-z)
-    pub theta: f64,
+    pub i: usize,      // Always < j
+    pub j: usize,      // Always > i
+    pub z: f64,        // z = -ln(w), so w = exp(-z)
+    pub theta: f64,    // Phase θ_ij (i < j)
     pub tensor: [[[f64; 3]; 3]; 3],
 }
 
@@ -29,6 +32,22 @@ impl Link {
     /// Set weight by updating z
     pub fn set_w(&mut self, w: f64) {
         self.z = -w.ln();
+    }
+    
+    /// Get the phase with proper sign based on direction
+    /// Returns θ_ij if from_node < to_node, -θ_ij otherwise
+    pub fn get_phase(&self, from_node: usize, to_node: usize) -> f64 {
+        debug_assert!(
+            (from_node == self.i && to_node == self.j) || 
+            (from_node == self.j && to_node == self.i),
+            "Invalid nodes for link"
+        );
+        
+        if from_node < to_node {
+            self.theta
+        } else {
+            -self.theta
+        }
     }
 }
 
@@ -84,7 +103,7 @@ impl Graph {
                     i,
                     j,
                     z,
-                    theta: 0.0,
+                    theta: rng.gen_range(-std::f64::consts::PI..std::f64::consts::PI),
                     tensor: random_tensor(rng),
                 });
             }
@@ -165,9 +184,10 @@ impl Graph {
     /// ∑_{triangles} cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
     pub fn triangle_sum(&self) -> f64 {
         self.triangles.iter().map(|&(i, j, k)| {
-            let t_ij = self.links[self.link_index(i, j)].theta;
-            let t_jk = self.links[self.link_index(j, k)].theta;
-            let t_ki = self.links[self.link_index(k, i)].theta;
+            // Use get_phase to ensure proper antisymmetry
+            let t_ij = self.get_phase(i, j);
+            let t_jk = self.get_phase(j, k);
+            let t_ki = self.get_phase(k, i);
             (t_ij + t_jk + t_ki).cos()
         }).sum()
     }
@@ -192,7 +212,10 @@ impl Graph {
     pub fn link_index(&self, i: usize, j: usize) -> usize {
         let n = self.n();
         let (i, j) = if i < j { (i, j) } else { (j, i) };
-        i * (n - 1) - i * (i + 1) / 2 + (j - i - 1)
+        // For a complete graph, links are stored in order:
+        // (0,1), (0,2), ..., (0,n-1), (1,2), (1,3), ..., (1,n-1), ..., (n-2,n-1)
+        let links_before_i = i * (2 * n - i - 1) / 2;
+        links_before_i + (j - i - 1)
     }
 
     /// Create either a z-update or phase perturbation.
@@ -268,6 +291,54 @@ impl Graph {
             StepInfo { accepted: false, delta_w: 0.0, delta_cos: 0.0 }
         }
     }
+    
+    /// Perform one Metropolis step with full action including spectral term
+    pub fn metropolis_step_full(
+        &mut self,
+        beta: f64,
+        alpha: f64,
+        gamma: f64,
+        n_cut: usize,
+        delta_z: f64,
+        delta_theta: f64,
+        rng: &mut impl Rng,
+    ) -> StepInfo {
+        let s_before = self.full_action(alpha, beta, gamma, n_cut);
+        let proposal = self.propose_update(delta_z, delta_theta, rng);
+        let s_after  = self.full_action(alpha, beta, gamma, n_cut);
+        let delta_s  = s_after - s_before;
+        let accept = if delta_s <= 0.0 {
+            true
+        } else {
+            rng.gen::<f64>() < (-delta_s).exp()
+        };
+
+        if accept {
+            match proposal {
+                Proposal::ZUpdate { idx: _idx, old_z, new_z } => {
+                    let old_w = (-old_z).exp();
+                    let new_w = (-new_z).exp();
+                    StepInfo {
+                        accepted: true,
+                        delta_w:  new_w - old_w,
+                        delta_cos: 0.0,
+                    }
+                },
+                Proposal::Phase { idx: _idx, old_th, new_th } => StepInfo {
+                    accepted: true,
+                    delta_w:  0.0,
+                    delta_cos: new_th.cos() - old_th.cos(),
+                },
+            }
+        } else {
+            // Revert.
+            match proposal {
+                Proposal::ZUpdate { idx, old_z, .. } => self.links[idx].z = old_z,
+                Proposal::Phase  { idx, old_th, .. } => self.links[idx].theta = old_th,
+            }
+            StepInfo { accepted: false, delta_w: 0.0, delta_cos: 0.0 }
+        }
+    }
 
     /// Project every link tensor with the AIB projector.
     /// Returns the Frobenius norm before and after projection.
@@ -293,5 +364,73 @@ impl Graph {
         self.links.iter()
             .map(|l| l.w())
             .fold(f64::INFINITY, f64::min)
+    }
+    
+    /// Get the phase θ_ij with proper antisymmetry
+    /// Returns θ_ij if i < j, -θ_ij if i > j, 0 if i == j
+    pub fn get_phase(&self, i: usize, j: usize) -> f64 {
+        if i == j {
+            return 0.0;
+        }
+        let link_idx = self.link_index(i, j);
+        self.links[link_idx].get_phase(i, j)
+    }
+    
+    /// Compute the weighted graph Laplacian matrix
+    /// L_ij = -w_ij for i ≠ j, L_ii = sum_k w_ik
+    pub fn laplacian_matrix(&self) -> DMatrix<f64> {
+        let n = self.n();
+        let mut laplacian = DMatrix::zeros(n, n);
+        
+        // Fill off-diagonal entries and accumulate diagonal
+        for link in &self.links {
+            let w = link.w();
+            // Off-diagonal negative entries
+            laplacian[(link.i, link.j)] = -w;
+            laplacian[(link.j, link.i)] = -w;
+            // Add to diagonal entries
+            laplacian[(link.i, link.i)] += w;
+            laplacian[(link.j, link.j)] += w;
+        }
+        
+        laplacian
+    }
+    
+    /// Compute eigenvalues of the graph Laplacian
+    /// Returns sorted eigenvalues (smallest first)
+    pub fn laplacian_eigenvalues(&self) -> Vec<f64> {
+        let laplacian = self.laplacian_matrix();
+        let eigen = SymmetricEigen::new(laplacian);
+        let mut eigenvalues: Vec<f64> = eigen.eigenvalues.iter().copied().collect();
+        eigenvalues.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        eigenvalues
+    }
+    
+    /// Compute the spectral regularization term
+    /// S_spec = gamma * sum_{n <= n_cut} (lambda_n - lambda_bar)^2
+    pub fn spectral_action(&self, gamma: f64, n_cut: usize) -> f64 {
+        if gamma == 0.0 || n_cut == 0 {
+            return 0.0;
+        }
+        
+        let eigenvalues = self.laplacian_eigenvalues();
+        let n_use = n_cut.min(eigenvalues.len());
+        
+        // Compute mean of first n_cut eigenvalues
+        let lambda_bar: f64 = eigenvalues[..n_use].iter().sum::<f64>() / n_use as f64;
+        
+        // Compute sum of squared deviations
+        let sum_sq: f64 = eigenvalues[..n_use]
+            .iter()
+            .map(|&lambda| (lambda - lambda_bar).powi(2))
+            .sum();
+        
+        gamma * sum_sq
+    }
+    
+    /// Full action including all terms
+    /// S = β Σ w ln w + α Σ_triangles cos(θ_ij+θ_jk+θ_ki) + γ Σ_n (λ_n - λ̄)²
+    pub fn full_action(&self, alpha: f64, beta: f64, gamma: f64, n_cut: usize) -> f64 {
+        self.action(alpha, beta) + self.spectral_action(gamma, n_cut)
     }
 }

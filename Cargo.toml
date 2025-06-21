@@ -55,11 +55,11 @@ path = "src/bin/benchmark_metal.rs"
 
 [[bin]]
 name = "quick_validation"
-path = "src/bin/quick_validation.rs"
+path = "src/bin/validation/quick_validation.rs"
 
 [[bin]]
 name = "debug_chi"
-path = "src/bin/debug_chi.rs"
+path = "src/bin/debug/debug_chi.rs"
 
 [[bin]]
 name = "critical_finder"
@@ -71,80 +71,88 @@ path = "src/bin/critical_finder_long.rs"
 
 [[bin]]
 name = "test_susceptibility"
-path = "src/bin/test_susceptibility.rs"
+path = "src/bin/debug/test_susceptibility.rs"
 
 [[bin]]
 name = "debug_mc_physics"
-path = "src/bin/debug_mc_physics.rs"
+path = "src/bin/debug/debug_mc_physics.rs"
 
 [[bin]]
 name = "forensic_energy_audit"
-path = "src/bin/forensic_energy_audit.rs"
+path = "src/bin/debug/forensic_energy_audit.rs"
 
 [[bin]]
 name = "debug_zero_moves"
-path = "src/bin/debug_zero_moves.rs"
+path = "src/bin/debug/debug_zero_moves.rs"
 
 [[bin]]
 name = "debug_no_op_detailed"
-path = "src/bin/debug_no_op_detailed.rs"
+path = "src/bin/debug/debug_no_op_detailed.rs"
 
 [[bin]]
 name = "trace_noop_rejection"
-path = "src/bin/trace_noop_rejection.rs"
+path = "src/bin/debug/trace_noop_rejection.rs"
 
 [[bin]]
 name = "simple_metropolis_test"
-path = "src/bin/simple_metropolis_test.rs"
+path = "src/bin/debug/simple_metropolis_test.rs"
 
 [[bin]]
 name = "precision_tracer"
-path = "src/bin/precision_tracer.rs"
+path = "src/bin/debug/precision_tracer.rs"
 
 [[bin]]
 name = "debug_metropolis_internal"
-path = "src/bin/debug_metropolis_internal.rs"
+path = "src/bin/debug/debug_metropolis_internal.rs"
 
 [[bin]]
 name = "ultra_precision_tracer"
-path = "src/bin/ultra_precision_tracer.rs"
+path = "src/bin/debug/ultra_precision_tracer.rs"
 
 [[bin]]
 name = "direct_debug_trace"
-path = "src/bin/direct_debug_trace.rs"
+path = "src/bin/debug/direct_debug_trace.rs"
 
 [[bin]]
 name = "simple_debug_test"
-path = "src/bin/simple_debug_test.rs"
+path = "src/bin/debug/simple_debug_test.rs"
 
 [[bin]]
 name = "focused_debug"
-path = "src/bin/focused_debug.rs"
+path = "src/bin/debug/focused_debug.rs"
 
 [[bin]]
 name = "precision_analysis"
-path = "src/bin/precision_analysis.rs"
+path = "src/bin/debug/precision_analysis.rs"
 
 [[bin]]
 name = "improved_triangle_delta"
-path = "src/bin/improved_triangle_delta.rs"
+path = "src/bin/debug/improved_triangle_delta.rs"
 
 [[bin]]
 name = "unconventional_physics"
-path = "src/bin/unconventional_physics.rs"
+path = "src/bin/physics_analysis/unconventional_physics.rs"
 
 [[bin]]
 name = "quick_unconventional"
-path = "src/bin/quick_unconventional.rs"
+path = "src/bin/physics_analysis/quick_unconventional.rs"
 
 [[bin]]
 name = "low_temp_degeneracy"
-path = "src/bin/low_temp_degeneracy.rs"
+path = "src/bin/physics_analysis/low_temp_degeneracy.rs"
 
 [[bin]]
 name = "publication_analysis"
-path = "src/bin/publication_analysis.rs"
+path = "src/bin/physics_analysis/publication_analysis.rs"
 
 [[bin]]
 name = "quick_publication_demo"
 path = "src/bin/quick_publication_demo.rs"
+
+[[bin]]
+name = "demo_spectral"
+path = "src/bin/demo_spectral.rs"
+
+[[bin]]
+name = "demo_antisymmetry"
+path = "src/bin/demo_antisymmetry.rs"
