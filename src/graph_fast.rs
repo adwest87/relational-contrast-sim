@@ -71,9 +71,9 @@ pub struct FastGraph {
     measurement_interval: usize,
     
     // Cached values
-    two_pi: f64,
-    inv_dt: f64,
-    ln_dt: f64,
+    _two_pi: f64,
+    _inv_dt: f64,
+    _ln_dt: f64,
 }
 
 /// Simple node structure
@@ -104,7 +104,7 @@ impl FastGraph {
         for i in 0..n {
             for j in (i + 1)..n {
                 let z = rng.gen_range(0.001..10.0);
-                let theta = 0.0;
+                let theta = rng.gen_range(0.0..TAU);  // Random angle [0, 2π)
                 links.push(FastLink::new(i, j, z, theta));
             }
         }
@@ -128,9 +128,9 @@ impl FastGraph {
             autocorr_window: Vec::with_capacity(1000),
             autocorr_tau: 10.0,  // Initial estimate
             measurement_interval: 10,
-            two_pi: TAU,
-            inv_dt: 1.0 / dt,
-            ln_dt: dt.ln(),
+            _two_pi: TAU,
+            _inv_dt: 1.0 / dt,
+            _ln_dt: dt.ln(),
         }
     }
     
@@ -170,9 +170,9 @@ impl FastGraph {
             autocorr_window: Vec::with_capacity(1000),
             autocorr_tau: 10.0,
             measurement_interval: 10,
-            two_pi: TAU,
-            inv_dt: 1.0 / graph.dt,
-            ln_dt: graph.dt.ln(),
+            _two_pi: TAU,
+            _inv_dt: 1.0 / graph.dt,
+            _ln_dt: graph.dt.ln(),
         }
     }
     
@@ -226,7 +226,7 @@ impl FastGraph {
                                self.links[idx_jk].theta + 
                                self.links[idx_ik].theta;
                 
-                sum += 3.0 * theta_sum.cos();
+                sum += theta_sum.cos();
             }
         }
         
@@ -267,62 +267,103 @@ impl FastGraph {
             let old_z = link.z;
             let old_exp_neg_z = link.exp_neg_z;
             let new_z = (old_z + rng.gen_range(-delta_z..=delta_z)).max(0.001);
-            let new_exp_neg_z = (-new_z).exp();
             
-            // Fast entropy change calculation
-            let delta_entropy = -new_z * new_exp_neg_z - (-old_z * old_exp_neg_z);
-            let delta_s = beta * delta_entropy;
-            
-            let accept = delta_s <= 0.0 || rng.gen_range(0.0..1.0) < (-delta_s).exp();
-            
-            if accept {
-                self.links[link_idx].update_z(new_z);
+            // Check for no-op due to boundary clamping
+            if (new_z - old_z).abs() < 1e-15 {
+                // True no-op: always accept
                 StepInfo {
                     accept: true,
-                    delta_w: new_exp_neg_z - old_exp_neg_z,
+                    delta_w: 0.0,
                     delta_cos: 0.0,
                 }
             } else {
-                StepInfo::rejected()
+                let new_exp_neg_z = (-new_z).exp();
+                
+                // Fast entropy change calculation
+                let delta_entropy = (-new_z * new_exp_neg_z) - (-old_z * old_exp_neg_z);
+                let delta_s = beta * delta_entropy;
+                
+                // Use epsilon comparison for near-zero energy changes  
+                const EPSILON: f64 = 1e-6;
+                
+                // Log any significant energy changes that might be precision issues
+                if delta_s.abs() > 1e-10 && delta_s.abs() < 1e-6 {
+                    eprintln!("PRECISION WARNING (Z): |ΔS|={:.2e}", delta_s.abs());
+                }
+                
+                let accept = if delta_s.abs() <= EPSILON { true } else { rng.gen_range(0.0..1.0) < (-delta_s).exp() };
+                
+                if accept {
+                    self.links[link_idx].update_z(new_z);
+                    StepInfo {
+                        accept: true,
+                        delta_w: new_exp_neg_z - old_exp_neg_z,
+                        delta_cos: 0.0,
+                    }
+                } else {
+                    StepInfo::rejected()
+                }
             }
         } else {
             // Phase update
             let link = &self.links[link_idx];
             let old_theta = link.theta;
+            let old_cos_theta = link.cos_theta;
             let d_theta = rng.gen_range(-delta_theta..=delta_theta);
             let new_theta = old_theta + d_theta;
             
-            // Calculate triangle sum change for affected triangles only
-            let delta_triangle = self.triangle_sum_delta(link_idx, new_theta);
-            let delta_s = alpha * delta_triangle;
             
-            let accept = delta_s <= 0.0 || rng.gen_range(0.0..1.0) < (-delta_s).exp();
-            
-            if accept {
-                let old_cos_theta = self.links[link_idx].cos_theta;
-                let old_exp_neg_z = self.links[link_idx].exp_neg_z;
-                self.links[link_idx].update_theta(new_theta);
-                
-                let delta_cos = old_exp_neg_z * (new_theta.cos() - old_cos_theta);
-                
+            // Check for no-op due to very small theta change
+            if (new_theta - old_theta).abs() < 1e-15 {
+                // True no-op: always accept
                 StepInfo {
                     accept: true,
                     delta_w: 0.0,
-                    delta_cos,
+                    delta_cos: 0.0,
                 }
             } else {
-                StepInfo::rejected()
+                // Calculate triangle sum change BEFORE applying the move
+                let delta_triangle = self.triangle_sum_delta(link_idx, new_theta);
+                let delta_s = alpha * delta_triangle;
+                
+                // Use epsilon comparison for near-zero energy changes  
+                const EPSILON: f64 = 1e-6;
+                
+                // Log any significant energy changes that might be precision issues
+                if delta_s.abs() > 1e-10 && delta_s.abs() < 1e-6 {
+                    eprintln!("PRECISION WARNING (THETA): |ΔS|={:.2e}", delta_s.abs());
+                }
+                
+                let accept = if delta_s.abs() <= EPSILON { true } else { rng.gen_range(0.0..1.0) < (-delta_s).exp() };
+                
+                if accept {
+                    self.links[link_idx].update_theta(new_theta);
+                    let delta_cos = new_theta.cos() - old_cos_theta;
+                    
+                    StepInfo {
+                        accept: true,
+                        delta_w: 0.0,
+                        delta_cos,
+                    }
+                } else {
+                    StepInfo::rejected()
+                }
             }
         }
     }
     
-    /// Calculate triangle sum change for a single link update
+    /// Calculate triangle sum change for a single link update with numerical precision
     fn triangle_sum_delta(&self, link_idx: usize, new_theta: f64) -> f64 {
         let link = &self.links[link_idx];
         let (i, j) = (link.i as usize, link.j as usize);
         let old_theta = link.theta;
+        let delta_theta = new_theta - old_theta;
         
-        let mut delta: f64 = 0.0;
+        // For very small changes, use analytical derivative to avoid precision loss
+        const SMALL_DELTA_THRESHOLD: f64 = 1e-8;
+        
+        // Collect contributions for Kahan summation
+        let mut contributions = Vec::new();
         
         // Only check triangles containing edge (i,j)
         for k in 0..self.n() {
@@ -338,16 +379,38 @@ impl FastGraph {
                     self.link_index(k, j) 
                 };
                 
-                // Old contribution
-                let old_sum = old_theta + self.links[idx_ik].theta + self.links[idx_jk].theta;
-                // New contribution
-                let new_sum = new_theta + self.links[idx_ik].theta + self.links[idx_jk].theta;
+                let other_sum = self.links[idx_ik].theta + self.links[idx_jk].theta;
+                let old_total = old_theta + other_sum;
                 
-                delta += 3.0 * (new_sum.cos() - old_sum.cos());
+                let contribution = if delta_theta.abs() < SMALL_DELTA_THRESHOLD {
+                    // Use analytical derivative: d/dx[cos(x)] = -sin(x)
+                    -old_total.sin() * delta_theta
+                } else {
+                    // Use direct calculation for larger changes
+                    let new_total = new_theta + other_sum;
+                    new_total.cos() - old_total.cos()
+                };
+                
+                contributions.push(contribution);
             }
         }
         
-        delta
+        // Use Kahan summation for numerical stability
+        self.kahan_sum(&contributions)
+    }
+    
+    /// Kahan summation algorithm for numerical stability
+    #[inline(always)]
+    fn kahan_sum(&self, values: &[f64]) -> f64 {
+        let mut sum = 0.0;
+        let mut c = 0.0;
+        for &val in values {
+            let y = val - c;
+            let t = sum + y;
+            c = (t - sum) - y;
+            sum = t;
+        }
+        sum
     }
     
     /// Update autocorrelation estimate
@@ -449,7 +512,13 @@ struct ObservableCache {
     mean_cos: f64,
     entropy: f64,
     triangle_sum: f64,
-    last_update: usize,
+    _last_update: usize,
+}
+
+impl Default for BatchedObservables {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BatchedObservables {

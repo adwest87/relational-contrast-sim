@@ -6,7 +6,6 @@ use scan::observables::Observables;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use rand_pcg::Pcg64;
-use std::collections::HashMap;
 
 /// Detailed state snapshot for debugging
 #[derive(Debug, Clone)]

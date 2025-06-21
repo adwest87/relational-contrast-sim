@@ -133,7 +133,7 @@ fn benchmark_optimized(n: usize, steps: usize, beta: f64, alpha: f64, seed: u64)
         
         // Measure every 100 steps
         if step % 100 == 0 && step > steps / 2 {
-            let sum_cos: f64 = graph.links.iter().map(|l| l.cos_theta as f64).sum();
+            let sum_cos: f64 = graph.links.iter().map(|l| l.cos_theta).sum();
             let mean_cos = sum_cos / graph.m() as f64;
             cos_sum += mean_cos;
             cos_sum_sq += mean_cos * mean_cos;
@@ -144,10 +144,10 @@ fn benchmark_optimized(n: usize, steps: usize, beta: f64, alpha: f64, seed: u64)
     let elapsed = start.elapsed();
     
     // Final measurements
-    let sum_w: f64 = graph.links.iter().map(|l| l.exp_neg_z as f64).sum();
+    let sum_w: f64 = graph.links.iter().map(|l| l.exp_neg_z).sum();
     let mean_w = sum_w / graph.m() as f64;
     let var_w = graph.links.iter()
-        .map(|l| (l.exp_neg_z as f64 - mean_w).powi(2))
+        .map(|l| (l.exp_neg_z - mean_w).powi(2))
         .sum::<f64>() / graph.m() as f64;
     
     let entropy = graph.entropy_action();

@@ -5,7 +5,6 @@ use scan::graph::{Graph, StepInfo};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use rand::RngCore;
-use rayon::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use csv::WriterBuilder;
 use std::sync::Mutex;
@@ -209,7 +208,7 @@ fn main() {
         .from_path("quick_test_results.csv")
         .expect("cannot create file");
 
-    wtr.write_record(&[
+    wtr.write_record([
         "beta","alpha","mean_cos","std_cos","susceptibility","C","S_bar","Delta_bar"
     ]).unwrap();
 

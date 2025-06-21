@@ -185,7 +185,7 @@ fn profile_optimized(n: usize, steps: usize, beta: f64, alpha: f64, seed: u64, o
     // Don't scale the times - just report them as measured
     
     // Final measurement
-    let sum_cos: f64 = graph.links.iter().map(|l| l.cos_theta as f64).sum();
+    let sum_cos: f64 = graph.links.iter().map(|l| l.cos_theta).sum();
     let mean_cos = sum_cos / graph.m() as f64;
     
     // Calculate magnetic susceptibility (same as original)

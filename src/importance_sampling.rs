@@ -13,6 +13,12 @@ pub struct RidgeImportanceSampler {
     alpha_range: (f64, f64),
 }
 
+impl Default for RidgeImportanceSampler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RidgeImportanceSampler {
     /// Create a new ridge-biased sampler
     pub fn new() -> Self {
@@ -101,6 +107,12 @@ pub struct AdaptiveRidgeSampler {
     history: Vec<(f64, f64, f64)>,  // (β, α, susceptibility)
     adaptation_rate: f64,
     min_samples: usize,
+}
+
+impl Default for AdaptiveRidgeSampler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AdaptiveRidgeSampler {
@@ -243,6 +255,37 @@ impl ImportanceMetropolis {
     }
 }
 
+/// Example usage in a simulation
+pub fn example_critical_scan() {
+    use rand::thread_rng;
+    
+    let mut rng = thread_rng();
+    let mut sampler = AdaptiveRidgeSampler::new();
+    
+    println!("Starting importance-sampled critical region scan...");
+    
+    // Generate importance-weighted samples
+    for i in 0..1000 {
+        let (beta, alpha, _weight) = sampler.sample_point(&mut rng);
+        
+        // Run simulation at (beta, alpha)
+        // let susceptibility = run_simulation(beta, alpha);
+        let susceptibility = 100.0; // Placeholder
+        
+        // Record for adaptation
+        sampler.record_measurement(beta, alpha, susceptibility);
+        
+        // Use importance weight in averaging
+        // weighted_average += susceptibility * weight;
+        
+        if i % 100 == 0 {
+            let (slope, intercept, width) = sampler.get_ridge_params();
+            println!("Step {}: Ridge = {:.3}β + {:.3}, width = {:.3}", 
+                     i, slope, intercept, width);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,7 +322,7 @@ mod tests {
             let alpha = alpha_true + rng.gen_range(-0.01..0.01);
             
             // Susceptibility peaks at true ridge
-            let dist = (alpha - alpha_true).abs();
+            let dist = ((alpha - alpha_true) as f64).abs();
             let chi = 100.0 * (-dist * dist / 0.001).exp();
             
             sampler.record_measurement(beta, alpha, chi);
@@ -289,36 +332,5 @@ mod tests {
         let (slope, intercept, _) = sampler.get_ridge_params();
         assert!(f64::abs(slope - 0.065) < 0.01);
         assert!(f64::abs(intercept - 1.305) < 0.01);
-    }
-}
-
-/// Example usage in a simulation
-pub fn example_critical_scan() {
-    use rand::thread_rng;
-    
-    let mut rng = thread_rng();
-    let mut sampler = AdaptiveRidgeSampler::new();
-    
-    println!("Starting importance-sampled critical region scan...");
-    
-    // Generate importance-weighted samples
-    for i in 0..1000 {
-        let (beta, alpha, weight) = sampler.sample_point(&mut rng);
-        
-        // Run simulation at (beta, alpha)
-        // let susceptibility = run_simulation(beta, alpha);
-        let susceptibility = 100.0; // Placeholder
-        
-        // Record for adaptation
-        sampler.record_measurement(beta, alpha, susceptibility);
-        
-        // Use importance weight in averaging
-        // weighted_average += susceptibility * weight;
-        
-        if i % 100 == 0 {
-            let (slope, intercept, width) = sampler.get_ridge_params();
-            println!("Step {}: Ridge = {:.3}β + {:.3}, width = {:.3}", 
-                     i, slope, intercept, width);
-        }
     }
 }

@@ -193,7 +193,7 @@ impl OptimizedGraph {
                 let link_ik = &self.links[tri_links[2] as usize];
                 
                 let theta_sum = link_ij.theta + link_jk.theta + link_ik.theta;
-                sum += 3.0 * (theta_sum as f64).cos();
+                sum += (theta_sum as f64).cos();
             }
         }
         
@@ -214,11 +214,11 @@ impl OptimizedGraph {
             for &link_idx in tri_links {
                 theta_sum_old += self.links[link_idx as usize].theta;
             }
-            let old_contrib = 3.0 * (theta_sum_old as f64).cos();
+            let old_contrib = (theta_sum_old as f64).cos();
             
             // New contribution
             let theta_sum_new = theta_sum_old - old_theta + new_theta;
-            let new_contrib = 3.0 * (theta_sum_new as f64).cos();
+            let new_contrib = (theta_sum_new as f64).cos();
             
             delta += new_contrib - old_contrib;
         }

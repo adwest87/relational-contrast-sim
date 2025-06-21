@@ -10,8 +10,6 @@ use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use scan::graph::{Graph, StepInfo};
-use std::sync::Mutex;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 struct AdaptiveConfig {
@@ -427,7 +425,7 @@ fn main() {
         .from_path(&args.output)
         .expect("cannot create output file");
     
-    wtr.write_record(&[
+    wtr.write_record([
         "beta", "alpha", "mean_w", "std_w", "mean_cos", "std_cos",
         "susceptibility", "C", "S_bar", "Delta_bar",
         "err_chi", "err_c", "n_samples",

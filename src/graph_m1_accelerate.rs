@@ -14,13 +14,13 @@ extern "C" {
     fn cblas_ddot(n: c_int, x: *const c_double, incx: c_int, 
                   y: *const c_double, incy: c_int) -> c_double;
     
-    fn cblas_daxpy(n: c_int, alpha: c_double, x: *const c_double, incx: c_int,
+    fn _cblas_daxpy(n: c_int, alpha: c_double, x: *const c_double, incx: c_int,
                    y: *mut c_double, incy: c_int);
     
-    fn cblas_dscal(n: c_int, alpha: c_double, x: *mut c_double, incx: c_int);
+    fn _cblas_dscal(n: c_int, alpha: c_double, x: *mut c_double, incx: c_int);
     
     // vDSP functions for vectorized operations
-    fn vDSP_vaddD(a: *const c_double, stride_a: c_int,
+    fn _vDSP_vaddD(a: *const c_double, stride_a: c_int,
                   b: *const c_double, stride_b: c_int,
                   c: *mut c_double, stride_c: c_int,
                   n: c_int);
@@ -117,7 +117,7 @@ impl AccelerateGraph {
         
         // Use Accelerate to compute exp(-z) for all links at once
         unsafe {
-            let mut neg_z: Vec<f64> = z_array.iter().map(|&z| -z).collect();
+            let neg_z: Vec<f64> = z_array.iter().map(|&z| -z).collect();
             let n = num_links as c_int;
             vvexp(exp_array.as_mut_ptr(), neg_z.as_ptr(), &n);
         }
@@ -166,7 +166,7 @@ impl AccelerateGraph {
             let mut result = vec![0.0; self.links.len()];
             
             // First compute -z
-            let mut neg_z: Vec<f64> = self.z_array.iter().map(|&z| -z).collect();
+            let neg_z: Vec<f64> = self.z_array.iter().map(|&z| -z).collect();
             
             // Multiply -z * exp(-z) using vDSP
             vDSP_vmulD(
@@ -225,7 +225,7 @@ impl AccelerateGraph {
                                        links[idx_jk].theta + 
                                        links[idx_ik].theta;
                         
-                        local_sum += 3.0 * theta_sum.cos();
+                        local_sum += theta_sum.cos();
                     }
                     
                     local_sum
@@ -264,7 +264,7 @@ fn link_index(i: usize, j: usize, n: usize) -> usize {
 }
 
 /// Benchmark Accelerate optimizations
-pub fn benchmark_accelerate(n: usize, steps: usize) {
+pub fn benchmark_accelerate(n: usize, _steps: usize) {
     use std::time::Instant;
     
     println!("\n=== Apple Accelerate Framework Benchmark ===");
@@ -274,9 +274,9 @@ pub fn benchmark_accelerate(n: usize, steps: usize) {
     
     // Test entropy calculation
     let start = Instant::now();
-    let mut entropy_sum = 0.0;
+    let mut _entropy_sum = 0.0;
     for _ in 0..10000 {
-        entropy_sum += graph.entropy_action_accelerate();
+        _entropy_sum += graph.entropy_action_accelerate();
     }
     let entropy_time = start.elapsed();
     println!("Entropy (Accelerate): {:.2} μs/call", 
@@ -293,9 +293,9 @@ pub fn benchmark_accelerate(n: usize, steps: usize) {
     
     // Test triangle sum
     let start = Instant::now();
-    let mut tri_sum = 0.0;
+    let mut _tri_sum = 0.0;
     for _ in 0..100 {
-        tri_sum += graph.triangle_sum_parallel();
+        _tri_sum += graph.triangle_sum_parallel();
     }
     let tri_time = start.elapsed();
     println!("Triangle sum (parallel): {:.2} μs/call", 

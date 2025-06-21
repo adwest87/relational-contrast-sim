@@ -68,7 +68,7 @@ fn main() {
     let mut sum_cos = g.links_cos_sum();
 
     // Recorder for time series after equilibration.
-    let mut recorder = Recorder::default();
+    let recorder = Recorder::default();
 
     // Progress bar.
     let bar = ProgressBar::new(n_steps as u64);
@@ -81,7 +81,7 @@ fn main() {
         .from_path("mc_observables.csv")
         .expect("cannot create mc_observables.csv");
 
-    obs_csv.write_record(&[
+    obs_csv.write_record([
         "step","acc_rate","delta_w","delta_theta",
         "avg_w","avg_cos_theta",
         "S_entropy","S_triangle","action"
@@ -90,7 +90,7 @@ fn main() {
     let mut theta_csv = WriterBuilder::new()
         .from_path("theta_final.csv")
         .expect("cannot create theta_final.csv");
-    theta_csv.write_record(&["link_i","link_j","theta"]).unwrap();
+    theta_csv.write_record(["link_i","link_j","theta"]).unwrap();
 
     // -------------------------------------------------------------------
     // Main loop

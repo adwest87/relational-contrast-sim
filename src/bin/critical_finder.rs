@@ -3,7 +3,6 @@
 
 use scan::graph::Graph;
 use scan::graph_fast::FastGraph;
-use rand::SeedableRng;
 use rand_pcg::Pcg64;
 use std::time::Instant;
 use rayon::prelude::*;

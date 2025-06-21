@@ -162,13 +162,13 @@ impl Graph {
         beta * self.entropy_action() + alpha * self.triangle_sum()
     }
 
-    /// ∑_{triangles} 3 cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
+    /// ∑_{triangles} cos(θ_ij+θ_jk+θ_ki)  (no coupling prefactor)
     pub fn triangle_sum(&self) -> f64 {
         self.triangles.iter().map(|&(i, j, k)| {
             let t_ij = self.links[self.link_index(i, j)].theta;
             let t_jk = self.links[self.link_index(j, k)].theta;
             let t_ki = self.links[self.link_index(k, i)].theta;
-            3.0 * (t_ij + t_jk + t_ki).cos()
+            (t_ij + t_jk + t_ki).cos()
         }).sum()
     }
 
@@ -244,7 +244,7 @@ impl Graph {
 
         if accept {
             match proposal {
-                Proposal::ZUpdate { idx, old_z, new_z } => {
+                Proposal::ZUpdate { idx: _idx, old_z, new_z } => {
                     let old_w = (-old_z).exp();
                     let new_w = (-new_z).exp();
                     StepInfo {
@@ -253,7 +253,7 @@ impl Graph {
                         delta_cos: 0.0,
                     }
                 },
-                Proposal::Phase { old_th, new_th, .. } => StepInfo {
+                Proposal::Phase { idx: _idx, old_th, new_th } => StepInfo {
                     accepted: true,
                     delta_w:  0.0,
                     delta_cos: new_th.cos() - old_th.cos(),

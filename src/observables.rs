@@ -28,7 +28,7 @@ impl Observables {
     /// Measure all observables from current graph state
     pub fn measure(graph: &Graph, beta: f64, alpha: f64) -> Self {
         let n_links = graph.m() as f64;
-        let n_tri = graph.n_tri() as f64;
+        let _n_tri = graph.n_tri() as f64;
         
         // Basic quantities
         let mean_w = graph.sum_weights() / n_links;
@@ -47,7 +47,7 @@ impl Observables {
         let susceptibility = n_links * (cos_squared - mean_cos.powi(2));
         
         // Specific heat (from action fluctuations - placeholder)
-        let action = graph.action(alpha, beta);
+        let _action = graph.action(alpha, beta);
         let specific_heat = 0.0; // Would need time series for proper calculation
         
         // Binder cumulant (needs 4th moment - placeholder)
@@ -83,6 +83,12 @@ pub struct TimeSeriesAccumulator {
     sum: f64,
     sum_sq: f64,
     sum_4th: f64,
+}
+
+impl Default for TimeSeriesAccumulator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TimeSeriesAccumulator {

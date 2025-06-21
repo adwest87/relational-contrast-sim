@@ -179,7 +179,7 @@ fn main() {
     // Write CSV.
     let mut wtr = WriterBuilder::new().from_path("scan_results.csv")
         .expect("cannot create scan_results.csv");
-    wtr.write_record(&[
+    wtr.write_record([
         "beta","alpha","mean_w","std_w","mean_cos","std_cos","susceptibility"
     ]).unwrap();
     for r in &rows {

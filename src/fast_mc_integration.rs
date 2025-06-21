@@ -44,7 +44,7 @@ impl FastMCRunner {
         
         // Track energy for autocorrelation
         for step in 0..min_steps {
-            let info = self.graph.metropolis_step(alpha, beta, delta_z, delta_theta, &mut self.rng);
+            let _info = self.graph.metropolis_step(alpha, beta, delta_z, delta_theta, &mut self.rng);
             
             // Update autocorrelation estimate every 10 steps
             if step % 10 == 0 {
@@ -131,9 +131,9 @@ impl FastMCRunner {
     }
     
     /// Convert QuickObservables to full Observables struct
-    pub fn to_full_observables(&self, quick: &QuickObservables, alpha: f64, beta: f64) -> Observables {
+    pub fn to_full_observables(&self, quick: &QuickObservables, _alpha: f64, _beta: f64) -> Observables {
         let n = self.graph.n() as f64;
-        let m = self.graph.m() as f64;
+        let _m = self.graph.m() as f64;
         
         // Calculate variance from susceptibility
         let link_variance = quick.susceptibility / n;

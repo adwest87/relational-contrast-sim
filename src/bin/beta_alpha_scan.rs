@@ -198,7 +198,7 @@ fn main() {
         .from_path("scan_results.csv")
         .expect("cannot create scan_results.csv");
 
-    wtr.write_record(&[
+    wtr.write_record([
         "beta","alpha","mean_w","std_w",
         "mean_cos","std_cos","susceptibility"
     ]).unwrap();

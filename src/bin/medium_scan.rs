@@ -267,7 +267,7 @@ fn run_single(beta: f64, alpha: f64, cfg: &MediumConfig, seed_base: u64) -> Row 
         
         // Log if acceptance is still poor after tuning
         let final_rate = accepted_count as f64 / cfg.n_steps as f64;
-        if final_rate < 0.15 || final_rate > 0.50 {
+        if !(0.15..=0.50).contains(&final_rate) {
             eprintln!(
                 "β={:.1} α={:.1} rep={}: final acc={:.1}% δw={:.3} δθ={:.3}", 
                 beta, alpha, rep, final_rate * 100.0, tuner_w.delta, tuner_th.delta
@@ -345,7 +345,7 @@ fn main() {
         .from_path("medium_scan_improved.csv")
         .expect("cannot create file");
 
-    wtr.write_record(&[
+    wtr.write_record([
         "beta", "alpha", "mean_cos", "std_cos", "susceptibility", "C", 
         "S_bar", "Delta_bar", "acc_rate", "final_dw", "final_dth"
     ]).unwrap();

@@ -235,7 +235,7 @@ fn main() {
         .from_path("scan_coarse.csv")   // new name
         .expect("cannot create scan_wide.csv");
 
-    wtr.write_record(&[
+    wtr.write_record([
     "beta","alpha",
     //"mean_w","std_w",
     "mean_cos","std_cos","susceptibility","C","S_bar","Delta_bar"

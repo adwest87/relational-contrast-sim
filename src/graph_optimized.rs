@@ -85,7 +85,7 @@ impl OptimizedGraph {
             let t_ij = self.links[self.link_index(i, j)].theta;
             let t_jk = self.links[self.link_index(j, k)].theta;
             let t_ki = self.links[self.link_index(k, i)].theta;
-            3.0 * (t_ij + t_jk + t_ki).cos()
+            (t_ij + t_jk + t_ki).cos()
         }).sum()
     }
 
@@ -99,7 +99,7 @@ impl OptimizedGraph {
         let t_ij = self.links[self.link_index(i, j)].theta;
         let t_jk = self.links[self.link_index(j, k)].theta;
         let t_ki = self.links[self.link_index(k, i)].theta;
-        3.0 * (t_ij + t_jk + t_ki).cos()
+        (t_ij + t_jk + t_ki).cos()
     }
 
     /// Compute change in triangle sum when link (i,j) phase changes by delta_theta - O(N)
@@ -144,7 +144,7 @@ impl OptimizedGraph {
                     self.links[self.link_index(tk, ti)].theta
                 };
                 
-                let new_contrib = 3.0 * (t_ij + t_jk + t_ki).cos();
+                let new_contrib = (t_ij + t_jk + t_ki).cos();
                 delta += new_contrib - old_contrib;
             }
             

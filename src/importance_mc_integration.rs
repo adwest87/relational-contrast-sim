@@ -10,8 +10,8 @@ use std::collections::HashMap;
 pub struct ImportanceSampledMC {
     graph: Graph,
     sampler: AdaptiveRidgeSampler,
-    current_beta: f64,
-    current_alpha: f64,
+    _current_beta: f64,
+    _current_alpha: f64,
     measurements: Vec<WeightedMeasurement>,
 }
 
@@ -36,8 +36,8 @@ impl ImportanceSampledMC {
         Self {
             graph,
             sampler,
-            current_beta,
-            current_alpha,
+            _current_beta: current_beta,
+            _current_alpha: current_alpha,
             measurements: Vec::new(),
         }
     }
@@ -81,7 +81,7 @@ impl ImportanceSampledMC {
             
             // Progress report
             if (point + 1) % 10 == 0 {
-                let (slope, intercept, width) = self.sampler.get_ridge_params();
+                let (slope, intercept, _width) = self.sampler.get_ridge_params();
                 println!("Point {}/{}: β={:.3}, α={:.3}, χ={:.2}, ridge={:.3}β+{:.3}", 
                          point + 1, n_points, beta, alpha, obs.susceptibility, slope, intercept);
             }
@@ -107,9 +107,9 @@ impl ImportanceSampledMC {
         }
         
         // Measure observables
-        let mut sum_obs = Observables::default();
+        let sum_obs = Observables::default();
         let measure_interval = 10;
-        let n_measurements = mc_steps / measure_interval;
+        let _n_measurements = mc_steps / measure_interval;
         
         for step in 0..mc_steps {
             self.graph.metropolis_step(alpha, beta, delta_z, delta_theta, rng);
@@ -137,7 +137,7 @@ impl ImportanceSampledMC {
         // Compute weighted averages
         let mut weighted_susceptibility = 0.0;
         let mut weighted_binder = 0.0;
-        let mut weighted_action = 0.0;
+        let weighted_action = 0.0;
         let mut weighted_entropy = 0.0;
         
         for m in &self.measurements {

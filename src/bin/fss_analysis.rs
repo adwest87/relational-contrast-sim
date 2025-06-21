@@ -1,9 +1,8 @@
 // src/bin/fss_analysis.rs - Analyze results from multiple system sizes
 
-use std::fs::File;
 use std::path::PathBuf;
 use clap::Parser;
-use csv::{Reader, ReaderBuilder, WriterBuilder};
+use csv::{ReaderBuilder, WriterBuilder};
 use scan::finite_size::{FiniteSizeAnalysis, FSAData};
 
 #[derive(Parser)]
@@ -41,7 +40,7 @@ fn read_data_file(path: &PathBuf) -> Result<(usize, Vec<DataPoint>), Box<dyn std
     let filename = path.file_stem().unwrap().to_str().unwrap();
     let size: usize = filename
         .split('n')
-        .last()
+        .next_back()
         .and_then(|s| s.parse().ok())
         .unwrap_or(48);
     
@@ -113,11 +112,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut wtr = WriterBuilder::new()
         .from_path(&args.output)?;
     
-    wtr.write_record(&["quantity", "value"])?;
-    wtr.write_record(&["beta_c", &beta_c.to_string()])?;
-    wtr.write_record(&["alpha_c", &alpha_c.to_string()])?;
-    wtr.write_record(&["gamma_over_nu", &gamma_over_nu.to_string()])?;
-    wtr.write_record(&["alpha_over_nu", &alpha_over_nu.to_string()])?;
+    wtr.write_record(["quantity", "value"])?;
+    wtr.write_record(["beta_c", &beta_c.to_string()])?;
+    wtr.write_record(["alpha_c", &alpha_c.to_string()])?;
+    wtr.write_record(["gamma_over_nu", &gamma_over_nu.to_string()])?;
+    wtr.write_record(["alpha_over_nu", &alpha_over_nu.to_string()])?;
     
     // Compare to known universality classes
     println!("\nUniversality class comparison:");

@@ -11,14 +11,14 @@ use ::rand_pcg::Pcg64;
 use ::rayon::prelude::*;
 
 // M1 cache-line size is 128 bytes
-const CACHE_LINE_SIZE: usize = 128;
+const _CACHE_LINE_SIZE: usize = 128;
 
 // M1 has 192KB L1 cache (128KB instruction + 64KB data per performance core)
 // Optimize chunk sizes for L1 data cache
 const L1_CHUNK_SIZE: usize = 8192; // 64KB / 8 bytes per f64
 
 // M1 has 12MB shared L2 cache
-const L2_CHUNK_SIZE: usize = 393216; // ~3MB to leave room for other data
+const _L2_CHUNK_SIZE: usize = 393216; // ~3MB to leave room for other data
 
 /// SIMD-optimized link structure aligned to cache lines
 #[repr(C, align(128))]
@@ -84,9 +84,9 @@ pub struct M1Graph {
     triangles: Arc<Vec<(u32, u32, u32)>>,
     
     // Cache-aligned buffers for SIMD operations
-    cos_buffer: Vec<f64>,
-    sin_buffer: Vec<f64>,
-    w_buffer: Vec<f64>,
+    _cos_buffer: Vec<f64>,
+    _sin_buffer: Vec<f64>,
+    _w_buffer: Vec<f64>,
     
     // Thread pool for parallel operations
     thread_pool: ::rayon::ThreadPool,
@@ -128,18 +128,18 @@ impl M1Graph {
             .unwrap();
         
         // Allocate SIMD buffers aligned to cache lines
-        let cos_buffer = vec![0.0; num_links];
-        let sin_buffer = vec![0.0; num_links];
-        let w_buffer = vec![0.0; num_links];
+        let _cos_buffer = vec![0.0; num_links];
+        let _sin_buffer = vec![0.0; num_links];
+        let _w_buffer = vec![0.0; num_links];
         
         Self {
             nodes: (0..n as u32).collect(),
             links,
             dt: 1.0,
             triangles: Arc::new(triangles),
-            cos_buffer,
-            sin_buffer,
-            w_buffer,
+            _cos_buffer,
+            _sin_buffer,
+            _w_buffer,
             thread_pool,
         }
     }
@@ -171,18 +171,18 @@ impl M1Graph {
             .unwrap();
             
         let num_links = links.len();
-        let cos_buffer = vec![0.0; num_links];
-        let sin_buffer = vec![0.0; num_links];
-        let w_buffer = vec![0.0; num_links];
+        let _cos_buffer = vec![0.0; num_links];
+        let _sin_buffer = vec![0.0; num_links];
+        let _w_buffer = vec![0.0; num_links];
         
         Self {
             nodes: (0..n as u32).collect(),
             links,
             dt: graph.dt,
             triangles: Arc::new(triangles),
-            cos_buffer,
-            sin_buffer,
-            w_buffer,
+            _cos_buffer,
+            _sin_buffer,
+            _w_buffer,
             thread_pool,
         }
     }
@@ -262,7 +262,7 @@ impl M1Graph {
                                        links[idx_jk].theta + 
                                        links[idx_ik].theta;
                         
-                        local_sum += 3.0 * theta_sum.cos();
+                        local_sum += theta_sum.cos();
                     }
                     
                     local_sum
@@ -408,12 +408,10 @@ impl M1Graph {
                 let theta_jk = self.links[idx_jk].theta;
                 
                 // Use SIMD for cosine calculations
-                unsafe {
-                    let old_sum = old_theta + theta_ik + theta_jk;
-                    let new_sum = new_theta + theta_ik + theta_jk;
-                    
-                    delta += 3.0 * (new_sum.cos() - old_sum.cos());
-                }
+                let old_sum = old_theta + theta_ik + theta_jk;
+                let new_sum = new_theta + theta_ik + theta_jk;
+                
+                delta += new_sum.cos() - old_sum.cos();
             }
         }
         

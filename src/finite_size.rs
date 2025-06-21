@@ -18,6 +18,12 @@ pub struct FiniteSizeAnalysis {
     data: Vec<FSAData>,
 }
 
+impl Default for FiniteSizeAnalysis {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FiniteSizeAnalysis {
     pub fn new() -> Self {
         Self { data: Vec::new() }
@@ -62,7 +68,7 @@ impl FiniteSizeAnalysis {
         // Group by size
         let mut by_size: HashMap<usize, Vec<&FSAData>> = HashMap::new();
         for d in &self.data {
-            by_size.entry(d.lattice_size).or_insert(Vec::new()).push(d);
+            by_size.entry(d.lattice_size).or_default().push(d);
         }
         
         // Find where Binder cumulants cross

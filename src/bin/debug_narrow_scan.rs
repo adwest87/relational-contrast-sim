@@ -439,7 +439,7 @@ fn main() {
         .from_path(&args.output)
         .expect("cannot create output file");
     
-    wtr.write_record(&[
+    wtr.write_record([
         "beta", "alpha", "mean_w", "std_w", "mean_cos", "std_cos", "susceptibility", 
         "C_action", "C_energy", "S_bar", "Delta_bar", "acc_rate",
         "max_action", "min_weight", "n_large_actions", "equilibrated"

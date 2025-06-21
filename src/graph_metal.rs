@@ -76,9 +76,9 @@ struct GPUObservables {
 /// Metal GPU-accelerated graph
 pub struct MetalGraph {
     // Metal resources
-    device: Device,
+    _device: Device,
     command_queue: CommandQueue,
-    library: Library,
+    _library: Library,
     
     // Compute pipelines
     metropolis_pipeline: ComputePipelineState,
@@ -94,7 +94,7 @@ pub struct MetalGraph {
     params_buffer: Buffer,
     accept_counter_buffer: Buffer,
     partial_sums_buffer: Buffer,
-    observables_buffer: Buffer,
+    _observables_buffer: Buffer,
     
     // Graph properties
     n_nodes: usize,
@@ -152,8 +152,8 @@ impl MetalGraph {
         );
         
         // Buffer for partial sums (one per threadgroup) - allocate extra space for observables
-        let n_threadgroups = (n_triangles + 1023) / 1024;
-        let n_obs_threadgroups = (n_links + 1023) / 1024;
+        let n_threadgroups = n_triangles.div_ceil(1024);
+        let n_obs_threadgroups = n_links.div_ceil(1024);
         let max_threadgroups = n_threadgroups.max(n_obs_threadgroups);
         let partial_sums_buffer = device.new_buffer(
             (max_threadgroups * 3 * mem::size_of::<f32>()) as u64,  // 3 floats per threadgroup for observables
@@ -183,9 +183,9 @@ impl MetalGraph {
         
         // Initialize RNG states on GPU
         let mut graph = Self {
-            device,
+            _device: device,
             command_queue,
-            library,
+            _library: library,
             metropolis_pipeline,
             metropolis_batched_pipeline,
             triangle_pipeline,
@@ -197,7 +197,7 @@ impl MetalGraph {
             params_buffer,
             accept_counter_buffer,
             partial_sums_buffer,
-            observables_buffer,
+            _observables_buffer: observables_buffer,
             n_nodes: n,
             n_links,
             n_triangles,
@@ -249,7 +249,7 @@ impl MetalGraph {
             depth: 1,
         };
         let threadgroups = MTLSize {
-            width: ((self.n_links + 255) / 256) as u64,
+            width: self.n_links.div_ceil(256) as u64,
             height: 1,
             depth: 1,
         };
@@ -304,7 +304,7 @@ impl MetalGraph {
             depth: 1,
         };
         let threadgroups = MTLSize {
-            width: ((self.n_links + 255) / 256) as u64,
+            width: self.n_links.div_ceil(256) as u64,
             height: 1,
             depth: 1,
         };
@@ -365,7 +365,7 @@ impl MetalGraph {
             depth: 1,
         };
         let threadgroups = MTLSize {
-            width: ((self.n_links + 255) / 256) as u64,
+            width: self.n_links.div_ceil(256) as u64,
             height: 1,
             depth: 1,
         };
@@ -389,7 +389,7 @@ impl MetalGraph {
         let encoder = command_buffer.new_compute_command_encoder();
         
         // Reset partial sums
-        let n_threadgroups = (self.n_triangles + 1023) / 1024;
+        let n_threadgroups = self.n_triangles.div_ceil(1024);
         unsafe {
             let sums_ptr = self.partial_sums_buffer.contents() as *mut f32;
             for i in 0..n_threadgroups {
@@ -431,7 +431,7 @@ impl MetalGraph {
     
     /// Compute observables on GPU
     pub fn compute_observables_gpu(&self) -> (f64, f64, f64) {
-        let n_threadgroups = ((self.n_links + 1023) / 1024) as usize;
+        let n_threadgroups = self.n_links.div_ceil(1024);
         
         // Use partial_sums_buffer for the float3 results
         unsafe {
@@ -489,7 +489,7 @@ impl MetalGraph {
     
     /// Compute entropy on GPU
     pub fn entropy_action_gpu(&self) -> f64 {
-        let n_threadgroups = ((self.n_links + 1023) / 1024) as usize;
+        let n_threadgroups = self.n_links.div_ceil(1024);
         
         // Reset partial results
         unsafe {

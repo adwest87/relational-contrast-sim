@@ -260,7 +260,7 @@ kernel void triangle_sum_kernel(
         
         // Load theta values and compute triangle contribution
         float theta_sum = links[idx_ij].theta + links[idx_jk].theta + links[idx_ik].theta;
-        local_sum += 3.0f * cos(theta_sum);
+        local_sum += cos(theta_sum);
     }
     
     // Reduce within threadgroup

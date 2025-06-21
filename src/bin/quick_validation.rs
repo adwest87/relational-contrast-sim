@@ -68,8 +68,8 @@ fn main() {
     
     // Equilibration phase with larger step sizes
     print!("Equilibration...");
-    let delta_z = 0.2;      // Larger steps to reduce acceptance
-    let delta_theta = 0.2;  // Balanced steps
+    let delta_z = 0.4;      // Moderate steps for ~50% acceptance
+    let delta_theta = 0.6;  // Slightly larger for phase moves
     
     for step in 0..equilibration_steps {
         let info = graph.metropolis_step(alpha, beta, delta_z, delta_theta, &mut rng);
@@ -212,28 +212,28 @@ fn main() {
     
     // Observable checks
     println!("\nObservables:");
-    let pass_accept = acceptance_rate >= 45.0 && acceptance_rate <= 55.0;
+    let pass_accept = (45.0..=55.0).contains(&acceptance_rate);
     println!("  {} Acceptance: {:.1}% [{}]", 
         if pass_accept { "✓" } else { "✗" },
         acceptance_rate,
         if pass_accept { "PASS" } else { "FAIL" }
     );
     
-    let pass_cos = mean_cos >= 0.15 && mean_cos <= 0.25;
+    let pass_cos = (0.15..=0.25).contains(&mean_cos);
     println!("  {} <cos θ> = {:.3} ± {:.3} [{}]",
         if pass_cos { "✓" } else { "✗" },
         mean_cos, error_cos,
         if pass_cos { "PASS" } else { "FAIL" }
     );
     
-    let pass_chi = mean_chi >= 30.0 && mean_chi <= 40.0;
+    let pass_chi = (30.0..=40.0).contains(&mean_chi);
     println!("  {} χ = {:.1} ± {:.1} [{}]",
         if pass_chi { "✓" } else { "✗" },
         mean_chi, error_chi,
         if pass_chi { "PASS" } else { "FAIL" }
     );
     
-    let pass_entropy = mean_entropy_second >= -0.5 && mean_entropy_second <= -0.3;
+    let pass_entropy = (-0.5..=-0.3).contains(&mean_entropy_second);
     println!("  {} S_entropy/link = {:.2} [{}]",
         if pass_entropy { "✓" } else { "✗" },
         mean_entropy_second,
