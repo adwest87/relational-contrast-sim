@@ -406,6 +406,36 @@ impl Graph {
         eigenvalues
     }
     
+    /// Compute the spectral gap: λ₂ - λ₁ where λ₁ = 0 for connected graphs
+    /// This is a key observable for emergent spacetime dimension
+    pub fn spectral_gap(&self) -> Result<f64, &'static str> {
+        if self.n() < 2 {
+            return Err("Need at least 2 nodes for spectral gap");
+        }
+        
+        let eigenvalues = self.laplacian_eigenvalues();
+        
+        // For connected graphs, λ₁ should be ≈ 0
+        if eigenvalues[0].abs() > 1e-10 {
+            return Err("Graph appears disconnected (λ₁ ≠ 0)");
+        }
+        
+        Ok(eigenvalues[1] - eigenvalues[0])
+    }
+    
+    /// Compute effective dimension: d_eff = -2ln(N)/ln(Δλ)
+    /// For emergent 4D spacetime, we expect d_eff ≈ 4
+    pub fn effective_dimension(&self) -> Result<f64, &'static str> {
+        let gap = self.spectral_gap()?;
+        
+        if gap <= 1e-10 {
+            return Err("Spectral gap too small for dimension calculation");
+        }
+        
+        let n = self.n() as f64;
+        Ok(-2.0 * n.ln() / gap.ln())
+    }
+    
     /// Compute the spectral regularization term
     /// S_spec = gamma * sum_{n <= n_cut} (lambda_n - lambda_bar)^2
     pub fn spectral_action(&self, gamma: f64, n_cut: usize) -> f64 {

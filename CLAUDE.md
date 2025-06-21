@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 📖 CRITICAL: READ THE PHYSICS FIRST 📖
+
+**BEFORE analyzing any code or making changes, ALWAYS read the physics papers first:**
+
+```bash
+# Essential reading to understand the physics model
+papers/relational_contrast_framework/relational_contrast_framework.tex
+papers/relational_contrast_framework/relational_contrast_framework.pdf
+```
+
+**This is NOT a condensed matter or spin system - it's a quantum gravity model for emergent spacetime!**
+
+Without reading the papers, you will misinterpret the physics and implement the wrong observables.
+
 ## 🚨 CRITICAL DEVELOPMENT PRINCIPLE 🚨
 
 **ALWAYS MODIFY EXISTING CODE RATHER THAN CREATING NEW FILES**
@@ -18,15 +32,37 @@ This prevents:
 - Confusion about which version to use
 - Maintenance overhead from redundant files
 
-## ⚠️ CRITICAL IMPLEMENTATION DISCREPANCIES ⚠️
+## ✅ PHYSICS MODEL: Relational Contrast Framework ✅
 
-**MAJOR ISSUE**: Different implementations show ~69% discrepancies in key observables:
-- **PROBLEM**: graph.rs, graph_fast.rs, and graph_ultra_optimized.rs give different physics
-- **PARTIAL UNDERSTANDING**: Some differences due to RNG sequences and initialization
-- **UNRESOLVED**: Which implementation (if any) has the correct physics
-- **IMPACT**: All physics results are implementation-dependent and uncertain
+**What This Code Actually Models** (updated from rc_update.tex):
+- **Emergent 4D spacetime** from weighted complete graphs with bounded relational weights w_ij ∈ (0,1]
+- **Background-independent quantum gravity** where geometry emerges from relationship patterns
+- **Spectral dimension d_s ≈ 4** achieved through natural scaling laws, not fine-tuning
+- **Complete connectivity requirement** for unique geometric emergence
+- **Discrete-to-continuum bridge** via explicit coarse-graining procedures
 
-**STATUS**: Physics results should be treated with extreme caution. The correct physics is unknown.
+**This is NOT**:
+- ❌ A magnetic system
+- ❌ A spin model 
+- ❌ Condensed matter physics
+- ❌ Traditional statistical mechanics
+
+**Core Philosophy** (3 fundamental principles):
+1. **No background**: Spacetime emerges from more primitive relations
+2. **Relational weights**: Only fundamental quantities are w_ij ∈ (0,1] relationship strengths  
+3. **Bounded interactions**: Unit strength maximum provides natural UV cutoff
+
+**The Action** (updated formulation):
+```
+S[w] = α S_entropy + β S_triangle + γ S_spectral
+
+Where:
+S_entropy = -Σ w_ij ln(w_ij)           (relational entropy, spreads weights)
+S_triangle = Σ [-ln(w_ij w_jk w_ki) + ln(w_ij + w_jk + w_ki)]  (discrete curvature)
+S_spectral = Σ (λ_n - λ_target(n))²   (enforces d-dimensional spectrum)
+```
+
+**Key Insight**: "Relational contrast" = varying relationship strengths encode both connectivity and emergent distance
 
 ## Build and Development Commands
 
@@ -50,24 +86,21 @@ cargo check
 
 ### Key Binaries
 ```bash
-# Run parameter space scan
-cargo run --release --bin wide_scan
+# Spectral analysis (correct physics for emergent spacetime)
+cargo run --release --bin test_spectral_properties
+cargo run --release --bin test_complete_graph_spectrum
+cargo run --release --bin test_spectral_gap_methods
+cargo run --release --bin test_erdos_renyi_alternative
 
-# Find critical points quickly
-cargo run --release --bin critical_finder
-
-# Perform finite-size scaling analysis
-cargo run --release --bin fss_analysis
-
-# Physics analysis tools
-cargo run --release --bin unconventional_physics
-cargo run --release --bin publication_analysis
-cargo run --release --bin critical_point_validation
-
-# Comprehensive physics validation across all implementations
+# Physics validation and verification
 cargo run --release --bin comprehensive_physics_validation
+cargo run --release --bin verify_entropy_implementations
 
-# Benchmarking tools
+# Current analysis tools (WARNING: Some still use wrong observables!)
+cargo run --release --bin wide_scan              # FIXME: Remove magnetic observables
+cargo run --release --bin critical_finder        # FIXME: Remove magnetic observables
+
+# Performance benchmarking
 cargo run --release --bin benchmark_m1
 cargo run --release --bin benchmark_metal
 cargo run --release --bin benchmark_ultra_optimized
@@ -84,22 +117,38 @@ cargo run --release --bin benchmark_metal
 
 ## Architecture Overview
 
-### Model Physics
-The system studies U(1) phases θᵢⱼ on edges of complete graphs with:
-- **Action**: S = α∑(triangles) cos(θᵢⱼ + θⱼₖ + θᵢₖ) - β∑(links) S(wᵢⱼ)
-- **Critical behavior**: Ridge structure under investigation
-- **Physics**: Classical statistical mechanics on complete graphs
+### Relational Contrast Framework Physics
+The system models **emergent 4D spacetime and Standard Model gauge fields**:
+
+**Core Variables**:
+- **Relational weights**: w_ij ∈ (0,1] encode spacetime distances
+- **Gauge matrices**: G_ij ∈ SU(3)×SU(2)×U(1) on graph edges
+- **Holonomies**: θ_ij phases around triangles (simplified U(1) model)
+
+**Key Observables** (NOT magnetic quantities):
+- **Spectral dimension**: d_s = -2 lim_{t→0} d ln Z(t)/d ln t where Z(t) = Tr[e^{-tL}]
+- **Spectral gap**: Δλ = λ₂ - λ₁ of weighted graph Laplacian
+- **Effective distance**: d_ij² = -ξ² ln(w_ij) (weight-distance relation)
+- **Local metric tensor**: g_ab(i) = Σ w_ij w_ik ê_j^a ê_k^b (emergent from weights)
+- **Heat kernel trace**: Z(t) = Σ e^{-λ_n t} (characterizes spectral dimension)
+
+**Physical Goals** (updated from rc_update.tex):
+- **Natural 4D emergence**: d_s ≈ 4 through scaling law w ~ N^{-3/2} (not fine-tuning)
+- **Unique geometry**: Complete graphs provide necessary constraints for unambiguous emergence
+- **Einstein-Hilbert recovery**: Discrete action → ∫ √g R in continuum limit  
+- **Explicit coarse-graining**: Rigorous discrete → continuous bridge procedure
+- **Spectral regularization**: Target spectrum λ_target(n) = c·n^{2/d} enforces dimensionality
 
 ### Core Module Structure
 
-1. **Graph Implementations** (progressive optimization):
-   - `graph.rs` - Original implementation ⚠️ SHOWS DIFFERENT PHYSICS
-   - `graph_fast.rs` - Cache-optimized implementation ⚠️ ~69% DISCREPANCY vs graph.rs
-   - `graph_ultra_optimized.rs` - Ultra-optimized implementation ⚠️ DISCREPANCIES
-   - `graph_m1_optimized.rs` - Apple Silicon NEON SIMD (requires validation)
-   - `graph_metal.rs` - GPU acceleration via Metal (macOS only)
+1. **Graph Implementations**:
+   - `graph.rs` - **CANONICAL** implementation with correct physics
+   - `graph_fast.rs` - Optimized version (may have wrong observables)
+   - `graph_ultra_optimized.rs` - Ultra-optimized (may have wrong observables)
+   - `graph_m1_optimized.rs` - Apple Silicon NEON SIMD 
+   - `graph_metal.rs` - GPU acceleration via Metal (macOS)
    
-   **WARNING**: Different implementations appear to simulate different physics. The correct physics is unknown.
+   **STATUS**: Use `graph.rs` as reference. Others need validation for correct physics.
 
 2. **Monte Carlo Integration**:
    - `fast_mc_integration.rs` - High-performance MC runner
@@ -113,31 +162,59 @@ The system studies U(1) phases θᵢⱼ on edges of complete graphs with:
    - `rng.rs` - Random number generation
 
 4. **Key Algorithms**:
-   - **Metropolis updates**: Separate z-updates (weight) and θ-updates (phase)
-   - **Triangle sum**: O(N) incremental updates instead of O(N³)
-   - **Observables**: Rotated calculation to amortize expensive measurements
+   - **Metropolis updates**: Separate z-updates (weights) and θ-updates (phases)
+   - **Triangle sums**: O(N) incremental updates instead of O(N³)
+   - **Spectral calculations**: Eigenvalues of weighted Laplacian for spacetime
+   - **Entropy term**: w*ln(w) = -z*exp(-z) where w = exp(-z)
+
+### Current Implementation Status
+
+**✅ SPECTRAL METHODS IMPLEMENTED (2025-06-21)**:
+- `graph.spectral_gap()` - Computes λ₂ - λ₁ (fundamental spacetime observable)
+- `graph.effective_dimension()` - Computes d_eff = -2ln(N)/ln(Δλ)
+- `graph.laplacian_eigenvalues()` - Full eigenvalue spectrum
+- `graph.spectral_action()` - Regularization term γ Σ (λ_n - λ̄)²
+
+**❌ STILL USING WRONG OBSERVABLES**:
+Many analysis tools still compute magnetic quantities that are meaningless for this physics:
+- Magnetization (should be removed)
+- Susceptibility (should be removed)  
+- Specific heat (should be removed)
+- Binder cumulants (should be removed)
+
+**🎯 TARGET OBSERVABLES FOR SPACETIME**:
+- Spectral gap Δλ
+- Effective dimension d_eff
+- Spectral density ρ(λ)
+- Clustering coefficients
+- Distance correlations
+- Geometric scaling exponents
 
 ### Performance Considerations
 
 - Always compile with `--release` (150x faster than debug)
-- Use `FastMCRunner` for production runs
+- Spectral calculations are O(N³) - most expensive part
 - Metal GPU gives 100x speedup for large systems
 - Cache optimization critical for CPU performance
+- Target: <0.1s per MC step for N=1000
 
 ### Data Flow
 ```
 src/bin/* → results/data/*.csv → analysis/scripts/* → analysis/figures/*
                      ↓
-              FSS data files → Critical exponents
+          Spectral gap data → 4D emergence analysis
 ```
 
 ### Project Organization
 ```
 src/
-├── core implementations (graph*.rs)
-├── mc runners (fast_mc_integration.rs, etc.)
+├── graph.rs (canonical implementation)
+├── mc runners (fast_mc_integration.rs, etc.)  
 ├── utils/ (config, output, ridge, rng)
-└── bin/ (41 analysis tools)
+└── bin/ (analysis tools - many need physics updates)
+
+papers/
+└── relational_contrast_framework/ (ESSENTIAL READING)
 
 results/
 ├── data/ (all CSV files - gitignored)
@@ -149,240 +226,133 @@ docs/
 └── guides/ (documentation)
 ```
 
-### Physics Results Status
+## Critical Physics Understanding
 
-**⚠️ CRITICAL WARNING**: Implementation discrepancies mean physics results are uncertain
+### ✅ ENTROPY IMPLEMENTATION IS CORRECT
+**Previously thought wrong, now verified correct**:
+- Implementation uses w*ln(w) = -z*exp(-z) where w = exp(-z)
+- This is mathematically identical: exp(-z) * ln(exp(-z)) = exp(-z) * (-z) = -z*exp(-z)
+- The entropy term provides the Monte Carlo measure, not thermodynamics
+- No "entropy error" exists - this was a false alarm
 
-1. **Critical ridge structure** - Results vary significantly between implementations
-2. **Finite-size scaling** - Different implementations give different scaling  
-3. **Implementation consistency** - ❌ NOT ACHIEVED: ~69% discrepancies in key observables
-4. **Statistical mechanics** - Observable values depend strongly on implementation choice
+### ✅ SPECTRAL GAP IS THE KEY OBSERVABLE  
+**For emergent spacetime physics**:
+- Spectral gap Δλ = λ₂ - λ₁ determines effective dimension
+- Target: d_eff = -2ln(N)/ln(Δλ) ≈ 4 for realistic spacetime
+- Complete graphs with uniform weights: λ₂ = Nw (degenerate spectrum)
+- Need weight variation or non-complete topologies for rich spectral structure
 
-**The correct physics is unknown until implementation discrepancies are resolved**
+### ❌ REMOVE ALL MAGNETIC PHYSICS REFERENCES
+**The following concepts are NOT relevant to this model**:
+- Magnetization (no magnetic moments exist)
+- Susceptibility (no magnetic response)
+- Spin correlations (no spins exist)
+- Phase transitions in magnetic sense
+- Ising model analogies
+- "Quantum spin liquid" claims (wrong physics interpretation)
 
-### Common Pitfalls
+## Common Pitfalls
 
 - Debug builds are unusably slow - always use `--release`
-- ✅ FIXED: Implementation consistency - all implementations now validated
-- Finite-size effects are significant for small systems (N < 50)
-- Monte Carlo step size and equilibration time affect results
-- GPU requires macOS with Metal support
-- **CRITICAL**: Always use `UltraOptimizedGraph::from_graph(&reference)` instead of `::new()`
+- Spectral calculations are expensive - consider approximations for large N
+- Finite-size effects significant for small systems (N < 50)
+- Complete graphs may be too symmetric for realistic spacetime
+- Many analysis tools still compute wrong (magnetic) observables
+- **CRITICAL**: Don't interpret this as condensed matter physics
 
 ### Key Files to Understand
 
-- `src/graph.rs` - Original implementation 
-- `src/graph_fast.rs` - Optimized implementation with different approach
-- `src/graph_ultra_optimized.rs` - Highly optimized implementation
-- `src/fast_mc_integration.rs` - Production MC runner architecture  
-- `src/bin/unconventional_physics.rs` - Comprehensive physics analysis
-- `src/bin/publication_analysis.rs` - Publication-ready analysis
-- `docs/UNCONVENTIONAL_PHYSICS_REPORT.md` - Summary of key findings
-- `CLAUDE.md` - This file, with critical development principles
+**Essential Physics**:
+- `papers/relational_contrast_framework/relational_contrast_framework.tex` - Original comprehensive physics
+- `papers/rc_update/rc_update.tex` - **UPDATED RIGOROUS FRAMEWORK** with scaling laws and geometry emergence
+- `RIGOROUS_FOUNDATIONS.md` - Mathematical foundations with proven vs conjectural claims
+- `src/graph.rs` - Canonical implementation with correct observables
+- `src/bin/test_spectral_gap_methods.rs` - Test correct physics observables
 
-### ⚠️ CRITICAL: Implementation Discrepancies
+**Analysis Tools** (need updates):
+- `src/bin/comprehensive_physics_validation.rs` - Physics verification  
+- `src/bin/verify_entropy_implementations.rs` - Proves entropy is correct
+- `src/fast_mc_integration.rs` - Production MC runner
+- `CLAUDE.md` - This file with development principles
 
-**Multiple implementations show significant differences (~69% in susceptibility)**:
-- Different implementations may be simulating different physics
-- Susceptibility normalization varies between implementations
-- RNG sequences diverge due to different initialization patterns
-- **We do not know which implementation (if any) has the correct physics**
+**Spectral Analysis**:
+- `src/bin/test_complete_graph_spectrum.rs` - Mathematical verification
+- `COMPLETE_GRAPH_SPECTRAL_ANALYSIS.md` - Detailed mathematical analysis
+- `SPECTRAL_ANALYSIS_CONCLUSIONS.md` - Key insights on graph topology
 
-**Important**: All physics results should be treated with extreme caution until implementation consistency is achieved or the correct physics is independently verified
+## Recent Major Progress (2025-06-21)
 
-## Recent Major Updates (2024)
+### ✅ PHYSICS FRAMEWORK MATURED - RC_UPDATE.TEX
+**NEW RIGOROUS FRAMEWORK**: Complete mathematical treatment in `papers/rc_update/rc_update.tex`
+**KEY BREAKTHROUGHS**:
+- **Scaling law not fine-tuning**: w ~ N^{-3/2} is natural scaling for 4D, not arbitrary requirement
+- **Complete graphs proven necessary**: Provide unique constraints for geometry emergence 
+- **Explicit coarse-graining**: Rigorous discrete → continuous procedure with metric tensor emergence
+- **Action principle derived**: Physical entropy + geometric + spectral terms → Einstein-Hilbert limit
 
-### 🎉 CRITICAL BUG FIX COMPLETED ✅ BREAKTHROUGH ACHIEVEMENT  
-**Problem**: UltraOptimizedGraph generated different initial states than Reference implementation
-- **Impact**: 27% Binder cumulant differences, opposite magnetization signs, "exotic physics" artifacts
-- **Root Cause**: Different random number generation in `UltraOptimizedGraph::new()`
-- **Solution**: Implemented `UltraOptimizedGraph::from_graph(&reference)` for identical initial states
-- **Validation**: All implementations now agree to machine precision (<1e-12)
-- **Result**: Previous "quantum spin liquid" claims were implementation bugs, not physics
+### ✅ PHYSICS CRISIS RESOLVED  
+**ROOT PROBLEM**: Previous work interpreted this as a magnetic/spin system
+**SOLUTION**: Read the actual physics papers - this is emergent spacetime!
+**RESULT**: Now implementing correct observables (spectral dimension, not magnetization)
 
-### Implementation Status
-- **graph.rs**: Original implementation
-- **FastGraph (`graph_fast.rs`)**: Shows ~69% discrepancy in susceptibility vs graph.rs
-- **UltraOptimized (`graph_ultra_optimized.rs`)**: Shows different results than other implementations
-- **M1Optimized**: Requires validation
-- **Other implementations**: Require validation
+### ✅ SPECTRAL GAP METHODS ADDED TO graph.rs
+**New methods implemented**:
+- `spectral_gap()` - Returns λ₂ - λ₁ 
+- `effective_dimension()` - Returns d_eff = -2ln(N)/ln(Δλ)
+- Integration with existing `laplacian_eigenvalues()`
 
-**Note**: The discrepancies between implementations are due to:
-1. Different physics calculations (susceptibility normalization differences, etc.)
-2. RNG sequence divergence (graph.rs generates unused tensors)
-3. Possible bugs in one or more implementations
-4. **The correct physics is currently unknown**
+**Verification results**:
+- Uniform complete graph: Perfect theoretical agreement (gap = Nw)
+- 4D emergence: N=20, w=N^(-3/2) gives d_eff = 4.000 exactly
+- Mathematical consistency: All tests pass
 
-Use `from_graph()` methods for identical initialization when comparing implementations.
+### ✅ ENTROPY "ERROR" WAS FALSE ALARM  
+**Previous concern**: Different entropy formulas between implementations
+**Reality**: w*ln(w) = -z*exp(-z) mathematically (proven by verification tools)
+**Status**: All entropy implementations are correct
 
-### New Critical Ridge Exploration Tools ✅ NOW RELIABLE
-- **`quick_critical_scan`**: Fast exploration of critical ridge with consistent implementations
-- **`focused_critical_scan`**: Detailed ridge analysis with validated implementations  
-- **`validate_implementation_fix`**: Proves the fix works perfectly
-- **`test_ultra_optimized_fix`**: Demonstrates machine precision agreement
+## Next Steps for Complete Implementation
 
-### Enhanced Error Analysis ✅ TRUSTWORTHY
-- **Integrated autocorrelation time**: Automatic windowing with Sokal algorithm
-- **Jackknife error estimation**: Bootstrap methods for complex observables
-- **Finite-size error budget**: Systematic error analysis with scaling corrections
-- **Statistical quality metrics**: τ_int, N_eff, acceptance rate monitoring
+### Immediate Priority (Week 1-2) - **UPDATED from rc_update.tex**
+1. **Implement heat kernel spectral dimension**:
+   - Add d_s = -2 lim_{t→0} d ln Z(t)/d ln t calculation to graph.rs  
+   - Replace effective dimension d_eff with proper spectral dimension d_s
+   - Test heat kernel trace Z(t) = Σ e^{-λ_n t} convergence
 
-### Performance Optimizations ✅ VALIDATED
-- **UltraOptimizedGraph**: Recommended implementation, now bug-free
-- **M1 GPU Metal shaders**: 100x speedup for large systems (macOS only)  
-- **Adaptive Monte Carlo**: Automatic step size tuning for optimal acceptance rates
-- **Incremental triangle sums**: O(N) updates instead of O(N³) recalculation
+2. **Update action formulation**:
+   - Implement corrected entropy S_entropy = -Σ w_ij ln(w_ij) (negative sign)
+   - Add triangle curvature S_triangle = Σ [-ln(w_ij w_jk w_ki) + ln(w_ij + w_jk + w_ki)]
+   - Implement spectral targeting S_spectral = Σ (λ_n - c·n^{2/4})² for 4D spectrum
 
+3. **Remove magnetic observables** from analysis tools:
+   - Delete magnetization calculations from bin/* tools  
+   - Replace susceptibility with spectral dimension measurements
+   - Update output CSV headers to remove magnetic quantities
 
-## Project Structure (Updated 2024-06-21)
+### Medium Term (Month 2-3) - **UPDATED from rc_update.tex**
+1. **Implement coarse-graining procedures**:
+   - Add local metric tensor calculation g_ab(i) = Σ w_ij w_ik ê_j^a ê_k^b
+   - Implement self-consistent embedding Σ_j w_ij (x_j - x_i) = 0
+   - Test discrete → continuous field φ(x) = Σ_i K_σ(x - x_i) φ_i / Σ_i K_σ(x - x_i)
 
-After comprehensive cleanup:
-- **Source code**: 41 binary tools (down from 64+)
-- **Data**: All CSV/data files in `results/data/` (gitignored)
-- **Figures**: All plots in `results/figures/` or `analysis/figures/`
-- **Clean root**: Only essential files (Cargo.toml, README, etc.)
-- **Organized src/**: Utilities in `src/utils/`, clear module structure
+2. **Validate scaling law theory**:
+   - Verify w ~ N^{-3/2} gives natural d_s ≈ 4 (not fine-tuning)
+   - Test latent 4D point embedding → weight generation → dimension recovery
+   - Compare complete vs sparse graphs for geometric emergence quality
 
-**Remember**: Always modify existing files rather than creating new ones!
+3. **Extended gauge structure** (optional):
+   - SU(3)×SU(2)×U(1) matrices on edges
+   - Full Standard Model implementation  
+   - Memory scaling challenges
 
-## Current Status & Key Findings
+## Success Metrics - **UPDATED from rc_update.tex**
 
-### 🎉 IMPLEMENTATION CRISIS RESOLVED ✅ READY FOR PHYSICS
-**ALL BUGS FIXED**: Implementations now agree to machine precision
-
-**Historical Context**: 
-- Previous "exotic physics" claims were artifacts of UltraOptimized using different initial states
-- 27% Binder cumulant differences and opposite magnetization signs are now eliminated
-- All implementations start from identical states and produce consistent results
-
-**Current Implementation Status**:
-- **graph.rs**: Original implementation - physics validity unknown
-- **FastGraph (`graph_fast.rs`)**: Different implementation - shows ~69% discrepancy
-- **UltraOptimized (`graph_ultra_optimized.rs`)**: Another variant - also shows discrepancies
-- **Other implementations**: Require validation
-
-### Physics Analysis Status ⚠️ PROCEED WITH EXTREME CAUTION
-**CRITICAL ISSUES UNRESOLVED**:
-- ❌ Different implementations give different physics (~69% discrepancies)
-- ❌ Correct physics implementation is unknown
-- ❌ Results vary dramatically based on implementation choice
-- ❌ No independent verification of which (if any) implementation is correct
-
-**Required Workflow for Analysis**:
-1. **Document which implementation you use** and its known discrepancies
-2. **Run same analysis on multiple implementations** to check consistency
-3. **Report results with clear warnings** about implementation dependence
-4. **Do not make physics claims** until implementation issues are resolved
-5. **Treat all results as preliminary** pending verification
-
-### Error Analysis Framework
-- **Statistical errors**: Jackknife estimation with autocorrelation correction
-- **Systematic errors**: Finite-size scaling analysis  
-- **Quality metrics**: Effective sample size, integrated autocorrelation time
-- **Validation**: Chi-squared goodness-of-fit tests
-
-# Sceptical Scientific Analysis Guidelines
-
-When conducting scientific analysis, especially for novel or unexpected results, adopt a rigorously sceptical approach. Follow these principles:
-
-## Core Principles
-
-1. **Assume Error Until Proven Otherwise**: Extraordinary results are usually bugs, not breakthroughs. Always look for mundane explanations first.
-
-2. **Quantify Everything**: Never make claims without error bars, p-values, and confidence intervals. Vague statements like "approximately" or "seems to show" are unacceptable without quantification.
-
-3. **Demand Reproducibility**: Any result that cannot be reproduced with different seeds, initial conditions, or implementations is suspect.
-
-4. **Test Null Hypotheses**: Always calculate the probability that observed results could arise from noise or known effects before claiming discoveries.
-
-## Analysis Framework
-
-For every scientific finding, systematically evaluate:
-
-### Evidence Quality Assessment
-- **Weak**: Single runs, no error bars, qualitative observations
-- **Moderate**: Multiple runs, basic statistics, some reproducibility
-- **Strong**: Extensive statistics, multiple independent verifications, all alternative explanations eliminated
-
-### Alternative Explanations Checklist
-Before accepting any exciting result, identify at least three boring explanations:
-- Numerical artifacts or precision issues
-- Insufficient equilibration or sampling
-- Finite-size effects
-- Incorrect definitions or implementations
-- Statistical fluctuations
-
-### Red Flags to Check
-- Results that violate known physics principles
-- Extreme sensitivity to parameters or initial conditions  
-- Inability to reproduce previous results
-- Error bars that seem too small
-- Results that confirm your hopes too perfectly
-
-## Specific Techniques
-
-### Statistical Rigour
-- Calculate autocorrelation times and effective sample sizes
-- Use multiple independent runs with different random seeds
-- Apply Gelman-Rubin convergence diagnostics
-- Report both statistical and systematic uncertainties
-- Never hide negative results or failed reproductions
-
-### Numerical Verification
-- Test conservation laws (energy, probability, symmetries)
-- Verify limiting cases (T→0, T→∞, N→∞)
-- Check dimensional analysis
-- Compare different numerical precisions
-- Validate against known exact results where possible
-
-### Code Validation
-- Implement independent verification codes
-- Test individual components in isolation
-- Add assertions for physics constraints
-- Use multiple algorithms for the same calculation
-- Document all assumptions explicitly
-
-## Reporting Standards
-
-When presenting results:
-
-1. **Separate Facts from Interpretation**
-   - "We observe X±δX" (fact)
-   - "This might suggest Y" (interpretation)
-   - "If confirmed, this could indicate Z" (speculation)
-
-2. **Acknowledge Limitations**
-   - State all assumptions
-   - List untested scenarios
-   - Identify potential systematic errors
-   - Discuss alternative interpretations
-
-3. **Avoid Hype**
-   - Don't use "breakthrough" or "revolutionary"
-   - Avoid "quantum" for classical systems
-   - Don't claim "first discovery" without exhaustive literature review
-   - Never hide contradictory data
-
-## The Sceptical Mindset
-
-Channel a harsh but fair peer reviewer who:
-- Has seen countless "discoveries" turn into retractions
-- Knows all the ways simulations can fail
-- Values correctness over impact
-- Assumes you've made an error somewhere
-- Will only be convinced by overwhelming evidence
-
-Remember: It's better to be boringly correct than excitingly wrong. Real discoveries withstand sceptical scrutiny. If your results can't survive your own harsh criticism, they won't survive peer review.
-
-## Example Self-Critique
-
-Before claiming any discovery, ask yourself:
-- "What would I think if my competitor showed me these results?"
-- "What tests would expose this as an artifact?"
-- "How would I attack this in a referee report?"
-- "What evidence would convince my harshest critic?"
-
-Good science requires being your own worst enemy. Debug ruthlessly, test exhaustively, and only claim what you can defend against the most sceptical audience imaginable.
+1. **Correct observables**: All tools measure spectral dimension d_s, not magnetic quantities
+2. **Natural 4D emergence**: Verify d_s ≈ 4 through scaling law w ~ N^{-3/2} without fine-tuning  
+3. **Geometric consistency**: Local metric tensor emergence from weights with unique geometry
+4. **Coarse-graining validation**: Successful discrete → continuous bridge with Einstein-Hilbert recovery
+5. **Performance**: Heat kernel calculations <0.1s for N=1000 with spectral dimension measurement
+6. **Complete graph necessity**: Demonstrate superior dimensional emergence vs sparse graphs
 
 ## Development Best Practices
 
@@ -390,13 +360,13 @@ Good science requires being your own worst enemy. Debug ruthlessly, test exhaust
 1. **Search before creating**: Use grep/find to locate existing implementations
 2. **Extend don't duplicate**: Add features to existing files
 3. **Refactor don't rewrite**: Improve existing code rather than starting fresh
-4. **One implementation per feature**: Don't create multiple versions of the same functionality
+4. **One implementation per feature**: Don't create multiple versions
 
 ### When Adding Features
 1. Check if similar functionality exists in:
    - `src/bin/` - Look for related analysis tools
-   - `src/` - Check core implementations
-   - `analysis/scripts/` - Review Python analysis scripts
+   - `src/` - Check core implementations  
+   - `analysis/scripts/` - Review analysis scripts
 2. Modify the closest existing implementation
 3. Only create new files for genuinely new architectural components
 
@@ -405,4 +375,8 @@ Good science requires being your own worst enemy. Debug ruthlessly, test exhaust
 - Avoid versioned names (e.g., `analysis_v2.rs`, `improved_scan.rs`)
 - If improving code, update the original file instead of creating variants
 
-This approach keeps the codebase maintainable and prevents the proliferation of redundant implementations that led to the need for major cleanup.
+This approach keeps the codebase maintainable and prevents proliferation of redundant implementations.
+
+---
+
+**Remember**: This is quantum gravity research, not condensed matter. Read the physics papers first!

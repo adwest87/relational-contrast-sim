@@ -9,6 +9,7 @@ pub mod importance_sampling;
 pub mod importance_mc_integration;
 pub mod error_analysis;
 pub mod graph_ultra_optimized;
+pub mod minimal_correct_physics;
 
 #[cfg(target_arch = "aarch64")]
 pub mod graph_m1_optimized;

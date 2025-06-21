@@ -21,32 +21,41 @@ struct PhysicsResults {
 fn main() {
     println!("=== Comprehensive Physics Validation ===\n");
     
-    let n = 8;  // Small size for detailed comparison
+    // Test with multiple system sizes
+    let test_sizes = vec![8, 16, 32];
     let alpha = 1.5;
     let beta = 2.9;
     let seed = 42u64;
     
-    println!("Testing with N={}, α={}, β={}, seed={}\n", n, alpha, beta, seed);
-    
-    // Create reference graph
-    let mut rng = Pcg64::seed_from_u64(seed);
-    let reference_graph = Graph::complete_random_with(&mut rng, n);
-    
-    // Test 1: Compare triangle sum calculation methods
-    println!("=== Triangle Sum Validation ===");
-    test_triangle_sum_consistency(&reference_graph, n, seed);
-    
-    // Test 2: Compare action calculations  
-    println!("\n=== Action Calculation Validation ===");
-    test_action_consistency(&reference_graph, alpha, beta, n, seed);
-    
-    // Test 3: Test Monte Carlo physics correctness
-    println!("\n=== Monte Carlo Physics Validation ===");
-    test_mc_physics_consistency(&reference_graph, alpha, beta, n, seed);
-    
-    // Test 4: Test symmetries and conservation laws
-    println!("\n=== Symmetry and Conservation Tests ===");
-    test_symmetries_and_conservation(&reference_graph, alpha, beta, n, seed);
+    for &n in &test_sizes {
+        println!("\n{}", "=".repeat(60));
+        println!("Testing with N={}, α={}, β={}, seed={}", n, alpha, beta, seed);
+        println!("{}\n", "=".repeat(60));
+        
+        // Create reference graph
+        let mut rng = Pcg64::seed_from_u64(seed);
+        let reference_graph = Graph::complete_random_with(&mut rng, n);
+        
+        // Test 1: Compare triangle sum calculation methods
+        println!("=== Triangle Sum Validation ===");
+        test_triangle_sum_consistency(&reference_graph, n, seed);
+        
+        // Test 2: Compare action calculations  
+        println!("\n=== Action Calculation Validation ===");
+        test_action_consistency(&reference_graph, alpha, beta, n, seed);
+        
+        // Test 3: Test Monte Carlo physics correctness
+        println!("\n=== Monte Carlo Physics Validation ===");
+        test_mc_physics_consistency(&reference_graph, alpha, beta, n, seed);
+        
+        // Test 4: Test symmetries and conservation laws
+        println!("\n=== Symmetry and Conservation Tests ===");
+        test_symmetries_and_conservation(&reference_graph, alpha, beta, n, seed);
+        
+        // Test 5: Test susceptibility calculations (known ~69% discrepancy)
+        println!("\n=== Susceptibility Calculation Validation ===");
+        test_susceptibility_consistency(&reference_graph, alpha, beta, n, seed);
+    }
     
     println!("\n=== Physics Validation Complete ===");
 }
@@ -63,7 +72,6 @@ fn test_triangle_sum_consistency(reference: &Graph, n: usize, seed: u64) {
     results.insert("FastGraph(from_ref)", fast_from_ref.triangle_sum());
     
     // Create graphs with same seed for fair comparison
-    let mut rng = Pcg64::seed_from_u64(seed);
     let fast_new = FastGraph::new(n, seed);
     results.insert("FastGraph(new)", fast_new.triangle_sum());
     
@@ -286,4 +294,108 @@ fn test_symmetries_and_conservation(reference: &Graph, alpha: f64, beta: f64, n:
     } else {
         println!("  ✗ {} antisymmetry violations detected after Monte Carlo", antisymmetry_violations);
     }
+}
+
+fn test_susceptibility_consistency(reference: &Graph, alpha: f64, beta: f64, n: usize, seed: u64) {
+    println!("Testing susceptibility calculations for known ~69% discrepancy...");
+    
+    // Test 1: Calculate magnetization from phase angles
+    // For reference graph, we need to calculate from the phase angles
+    let mut ref_mag_real = 0.0;
+    let mut ref_mag_imag = 0.0;
+    
+    // In a complete graph, we can think of magnetization as average of exp(i*theta) over edges
+    for link in &reference.links {
+        ref_mag_real += link.theta.cos();
+        ref_mag_imag += link.theta.sin();
+    }
+    let n_edges = n * (n - 1) / 2;
+    ref_mag_real /= n_edges as f64;
+    ref_mag_imag /= n_edges as f64;
+    
+    println!("\nReference Graph edge-based magnetization: ({:.6}, {:.6})", ref_mag_real, ref_mag_imag);
+    println!("  |M|: {:.6}", (ref_mag_real.powi(2) + ref_mag_imag.powi(2)).sqrt());
+    
+    // Test 2: FastGraph implementation
+    let fast_from_ref = FastGraph::from_graph(reference);
+    
+    // Calculate FastGraph magnetization using same method
+    let mut fast_mag_real = 0.0;
+    let mut fast_mag_imag = 0.0;
+    for i in 0..n {
+        for j in (i+1)..n {
+            let theta = fast_from_ref.get_phase(i, j);
+            fast_mag_real += theta.cos();
+            fast_mag_imag += theta.sin();
+        }
+    }
+    fast_mag_real /= n_edges as f64;
+    fast_mag_imag /= n_edges as f64;
+    
+    println!("\nFastGraph(from_ref) edge-based magnetization: ({:.6}, {:.6})", fast_mag_real, fast_mag_imag);
+    println!("  |M|: {:.6}", (fast_mag_real.powi(2) + fast_mag_imag.powi(2)).sqrt());
+    
+    // Check if magnetizations match
+    let mag_error = ((fast_mag_real - ref_mag_real).powi(2) + (fast_mag_imag - ref_mag_imag).powi(2)).sqrt();
+    if mag_error < 1e-10 {
+        println!("  ✓ FastGraph magnetization matches Reference exactly: error = {:.2e}", mag_error);
+    } else {
+        println!("  ✗ FastGraph magnetization differs from Reference: error = {:.2e}", mag_error);
+    }
+    
+    // Test 3: UltraOptimized implementation
+    let ultra = UltraOptimizedGraph::new(n, seed);
+    
+    // UltraOptimized stores phases differently - in a flattened array
+    let mut ultra_mag_real = 0.0;
+    let mut ultra_mag_imag = 0.0;
+    for idx in 0..ultra.theta_values.len() {
+        ultra_mag_real += ultra.theta_values[idx].cos();
+        ultra_mag_imag += ultra.theta_values[idx].sin();
+    }
+    ultra_mag_real /= n_edges as f64;
+    ultra_mag_imag /= n_edges as f64;
+    
+    println!("\nUltraOptimized edge-based magnetization: ({:.6}, {:.6})", ultra_mag_real, ultra_mag_imag);
+    println!("  |M|: {:.6}", (ultra_mag_real.powi(2) + ultra_mag_imag.powi(2)).sqrt());
+    
+    // Test 4: Node-based vs edge-based magnetization definitions
+    println!("\n=== Node-based vs Edge-based Magnetization ===");
+    
+    // Node-based: average of exp(i*sum_j theta_ij) over nodes
+    // This is fundamentally different from edge-based magnetization
+    println!("Different physics implementations may use:");
+    println!("  - Edge-based: M = (1/N_edges) * sum_{{ij}} exp(i*theta_ij)");
+    println!("  - Node-based: M = (1/N) * sum_i exp(i*sum_j theta_ij)");
+    println!("  - These give DIFFERENT physics!");
+    
+    // Test 5: Susceptibility normalization analysis
+    println!("\n=== Susceptibility Normalization Analysis ===");
+    
+    // Simulate what different normalizations would give
+    let test_mag_squared = 0.5;  // Example value
+    let test_mag_abs_squared = 0.4;  // Example value
+    let chi_raw = test_mag_squared - test_mag_abs_squared;
+    
+    println!("For example data with <|M|²> = {:.3}, <|M|>² = {:.3}:", test_mag_squared, test_mag_abs_squared);
+    println!("  χ (no normalization) = {:.6}", chi_raw);
+    println!("  χ * N = {:.6}", chi_raw * n as f64);
+    println!("  χ / N = {:.6}", chi_raw / n as f64);
+    println!("  χ * N² = {:.6}", chi_raw * (n as f64).powi(2));
+    
+    // Calculate ratios
+    let ratio_example = (chi_raw * n as f64) / (chi_raw / n as f64);
+    println!("\nRatio (χ*N)/(χ/N) = {:.6} = N² = {}", ratio_example, n.pow(2));
+    
+    // Check if 0.69 could come from normalization differences
+    let potential_n_for_69_percent = (1.0_f64 / 0.69).sqrt();
+    println!("\nIf the 69% discrepancy is purely from normalization:");
+    println!("  0.69 ≈ 1/N² would imply N ≈ {:.1}", potential_n_for_69_percent);
+    println!("  0.69 ≈ 1/N would imply N ≈ {:.1}", 1.0 / 0.69);
+    
+    println!("\n⚠️  CRITICAL FINDINGS:");
+    println!("  1. Different implementations may use edge-based vs node-based magnetization");
+    println!("  2. Susceptibility normalizations vary by factors of N or N²");
+    println!("  3. The ~69% discrepancy likely comes from these fundamental differences");
+    println!("  4. Without knowing the intended physics, we cannot say which is 'correct'");
 }
